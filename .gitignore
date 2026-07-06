@@ -57,6 +57,8 @@ temp/
 
 # Generated reports
 reports/*.log
+reports/ci/
+reports/ci-local/
 
 # Learning data and model artifacts
 learning_data/*.csv
