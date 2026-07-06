@@ -96,16 +96,26 @@ class WebFlowStateExtractor:
 
 
 class MarkovFlowModel:
-    """First-order Markov chain calibrated on held-out normal flow sequences."""
+    """Context-aware Markov chain calibrated on held-out normal flow sequences."""
 
-    def __init__(self, *, target_fpr: float = 0.01, alpha: float = 0.1) -> None:
+    def __init__(
+        self,
+        *,
+        target_fpr: float = 0.01,
+        alpha: float = 0.1,
+        transition_weight: float = 0.8,
+    ) -> None:
         if not 0.0 < target_fpr <= 1.0:
             raise ValueError("target_fpr must be in (0, 1]")
         if alpha <= 0.0:
             raise ValueError("alpha must be positive")
+        if not 0.0 <= transition_weight <= 1.0:
+            raise ValueError("transition_weight must be in [0, 1]")
         self._target_fpr = target_fpr
         self._alpha = alpha
+        self._transition_weight = transition_weight
         self._transitions: dict[str, Counter[str]] = {}
+        self._target_counts: Counter[str] = Counter()
         self._states: set[str] = set()
         self._threshold: float | None = None
         self._train_count = 0
@@ -137,6 +147,7 @@ class MarkovFlowModel:
         validation_sequences: Sequence[Sequence[str]],
     ) -> None:
         self._transitions = defaultdict(Counter)
+        self._target_counts = Counter()
         self._states = set()
         self._train_count = sum(len(seq) for seq in normal_sequences)
         self._validation_count = sum(len(seq) for seq in validation_sequences)
@@ -145,6 +156,7 @@ class MarkovFlowModel:
             previous = START_STATE
             for current in sequence:
                 self._transitions[previous][current] += 1
+                self._target_counts[current] += 1
                 self._states.add(current)
                 previous = current
 
@@ -195,13 +207,29 @@ class MarkovFlowModel:
         return MarkovAssessment(blocked, score, previous_state, current_state, reason)
 
     def score_transition(self, previous_state: str, current_state: str) -> float:
+        return math.log(self._transition_probability(previous_state, current_state))
+
+    def _transition_probability(self, previous_state: str, current_state: str) -> float:
         vocabulary = max(len(self._states), 1)
         counts = self._transitions.get(previous_state, Counter())
         total = sum(counts.values())
-        probability = (counts[current_state] + self._alpha) / (
+        first_order = (counts[current_state] + self._alpha) / (
             total + self._alpha * vocabulary
         )
-        return math.log(probability)
+        if self._transition_weight >= 1.0:
+            return first_order
+
+        target_total = sum(self._target_counts.values())
+        target_prior = (self._target_counts[current_state] + self._alpha) / (
+            target_total + self._alpha * vocabulary
+        )
+        probability = (
+            self._transition_weight * first_order
+            + (1.0 - self._transition_weight) * target_prior
+        )
+        if counts[current_state] > 0:
+            probability = max(probability, 1.0 / len(counts))
+        return probability
 
     def _scores(self, sequences: Iterable[Sequence[str]]) -> Iterable[float]:
         for sequence in sequences:

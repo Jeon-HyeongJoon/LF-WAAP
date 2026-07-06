@@ -49,3 +49,35 @@ def test_markov_model_blocks_unseen_web_flow_transition() -> None:
     assert not model.assess_transition(START_STATE, home).blocked
     assert not model.assess_transition(home, login).blocked
     assert model.assess_transition(home, admin_delete).blocked
+
+
+def test_markov_model_keeps_observed_mid_flow_branches_normal() -> None:
+    home = "GET /"
+    login = "GET /login"
+    login_submit = "POST /login"
+    product = "GET /products/{num}?page,ref"
+    search = "GET /search?page,q"
+    account = "GET /account"
+    cart = "POST /cart"
+    checkout = "POST /checkout"
+    admin_delete = "POST /admin/delete"
+
+    train = (
+        [[home, login, login_submit, product, cart, checkout] for _ in range(12)]
+        + [[home, login, login_submit, search, cart, checkout] for _ in range(3)]
+        + [[home, login, login_submit, account, cart, checkout] for _ in range(2)]
+        + [[home, login, login_submit, checkout, cart, checkout]]
+    )
+    validation = [
+        [home, login, login_submit, product, cart, checkout],
+        [home, login, login_submit, search, cart, checkout],
+        [home, login, login_submit, account, cart, checkout],
+        [home, login, login_submit, checkout, cart, checkout],
+    ]
+    model = MarkovFlowModel(target_fpr=0.1)
+
+    model.fit(train, validation)
+
+    assert not model.assess_transition(login_submit, account).blocked
+    assert not model.assess_transition(login_submit, checkout).blocked
+    assert model.assess_transition(login_submit, admin_delete).blocked
