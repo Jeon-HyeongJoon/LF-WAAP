@@ -1,0 +1,25 @@
+# Minimal OWASP-flavored rule set for the POC.
+# Each rule's `pattern` is a case-insensitive regex matched against the
+# request's inspectable payload (path + query + body).
+rules:
+  - id: SQLI-001
+    description: "SQL injection - UNION SELECT"
+    pattern: "union\\s+select"
+  - id: SQLI-002
+    description: "SQL injection - boolean tautology (OR 1=1)"
+    pattern: "\\bor\\b\\s+\\d+\\s*=\\s*\\d+"
+  - id: SQLI-003
+    description: "SQL injection - comment/terminator"
+    pattern: "(--|#|;)\\s*$"
+  - id: XSS-001
+    description: "Cross-site scripting - script tag"
+    pattern: "<\\s*script"
+  - id: XSS-002
+    description: "Cross-site scripting - javascript: / event handler"
+    pattern: "(javascript:|onerror\\s*=|onload\\s*=)"
+  - id: LFI-001
+    description: "Path traversal"
+    pattern: "(\\.\\./|\\.\\.\\\\)"
+  - id: RCE-001
+    description: "Command injection - shell metacharacters with command"
+    pattern: "[;&|`]\\s*(cat|ls|whoami|id|wget|curl|nc)\\b"

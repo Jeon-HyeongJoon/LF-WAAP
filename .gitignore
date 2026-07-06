@@ -1,0 +1,70 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Virtual environments and local Python tooling
+.venv/
+venv/
+env/
+ENV/
+.python-version
+.tox/
+.nox/
+
+# Build and packaging artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# IDE, editor, and local agent state
+.idea/
+.vscode/
+.claude/
+.cursor/
+.codex/
+*.swp
+*.swo
+*~
+
+# OS and filesystem metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Logs and runtime output
+*.log
+logs/
+tmp/
+temp/
+
+# Generated reports
+reports/*.log
+
+# Learning data and model artifacts
+learning_data/*.csv
+learning_data/*.pkl
+*.joblib
+*.onnx
+
+# Docker and service-local state
+.docker/
+docker-data/
+*.pid

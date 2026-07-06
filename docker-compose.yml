@@ -1,0 +1,21 @@
+# 로컬 Kafka 브로커 (KRaft 모드 — Zookeeper 불필요, 단일 노드).
+# 실행:  docker compose up -d
+# 중지:  docker compose down
+# 토픽은 auto-create로 첫 publish 때 자동 생성된다(POC 편의).
+services:
+  kafka:
+    image: apache/kafka:3.8.0
+    container_name: lf-waap-kafka
+    ports:
+      - "9092:9092" # 호스트(파이썬 파이프라인) → 브로커
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
