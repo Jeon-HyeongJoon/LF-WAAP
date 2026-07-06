@@ -20,6 +20,8 @@ from waf.infrastructure.behavior.markov_flow import (
 from waf.infrastructure.hmm.hmm_detector import HmmDetector
 from waf.infrastructure.hmm.partitioned_hmm import Assessment
 
+_DEFAULT_MARKOV_BLOCK_MARGIN = 1.25
+
 
 @dataclass(frozen=True, slots=True)
 class HybridFlowAssessment:
@@ -46,10 +48,14 @@ class HybridFlowDetector:
         markov_model: MarkovFlowModel | None = None,
         hmm_detector: HmmDetector | None = None,
         state_extractor: WebFlowStateExtractor | None = None,
+        markov_block_margin: float = _DEFAULT_MARKOV_BLOCK_MARGIN,
     ) -> None:
+        if markov_block_margin < 0.0:
+            raise ValueError("markov_block_margin must be non-negative")
         self._markov = markov_model or MarkovFlowModel()
         self._hmm = hmm_detector or HmmDetector()
         self._state_extractor = state_extractor or WebFlowStateExtractor()
+        self._markov_block_margin = markov_block_margin
         self._session_states: dict[str, str] = {}
 
     @property
@@ -89,8 +95,17 @@ class HybridFlowDetector:
 
         markov_suspicion = _markov_suspicion(markov, self._markov.threshold)
         hmm_suspicion = max(0.0, -hmm.score) if hmm.blocked else 0.0
-        blocked = (markov.covered and markov.blocked) or (hmm.covered and hmm.blocked)
-        reason = _combine_reason(markov, hmm)
+        markov_blocks = self._is_severe_markov_violation(markov, markov_suspicion)
+        hmm_blocks = hmm.covered and hmm.blocked
+        blocked = markov_blocks or hmm_blocks
+        reason = _combine_reason(
+            markov,
+            hmm,
+            markov_blocked=markov_blocks,
+            hmm_blocked=hmm_blocks,
+            markov_margin=markov_suspicion,
+            markov_block_margin=self._effective_markov_block_margin(),
+        )
         return HybridFlowAssessment(
             blocked=blocked,
             score=max(markov_suspicion, hmm_suspicion),
@@ -122,6 +137,16 @@ class HybridFlowDetector:
     def load(cls, path: str | Path) -> "HybridFlowDetector":
         return cast(HybridFlowDetector, pickle.loads(Path(path).read_bytes()))
 
+    def _is_severe_markov_violation(
+        self, markov: MarkovAssessment, markov_suspicion: float
+    ) -> bool:
+        if not markov.covered or not markov.blocked:
+            return False
+        return markov_suspicion >= self._effective_markov_block_margin()
+
+    def _effective_markov_block_margin(self) -> float:
+        return getattr(self, "_markov_block_margin", _DEFAULT_MARKOV_BLOCK_MARGIN)
+
 
 def _flatten(sequences: Sequence[Sequence[Flow]]) -> list[Flow]:
     return [flow for sequence in sequences for flow in sequence]
@@ -133,10 +158,23 @@ def _markov_suspicion(markov: MarkovAssessment, threshold: float | None) -> floa
     return max(0.0, threshold - markov.score)
 
 
-def _combine_reason(markov: MarkovAssessment, hmm: Assessment) -> str:
+def _combine_reason(
+    markov: MarkovAssessment,
+    hmm: Assessment,
+    *,
+    markov_blocked: bool,
+    hmm_blocked: bool,
+    markov_margin: float,
+    markov_block_margin: float,
+) -> str:
     parts: list[str] = []
     if markov.covered:
         parts.append(markov.reason)
+        if markov.blocked and not markov_blocked and not hmm_blocked:
+            parts.append(
+                "hybrid allowed: isolated markov anomaly margin "
+                f"{markov_margin:.3f} < fusion margin {markov_block_margin:.3f}"
+            )
     if hmm.covered:
         parts.append(hmm.reason)
     if not parts:
