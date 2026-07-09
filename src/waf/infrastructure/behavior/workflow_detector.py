@@ -449,7 +449,7 @@ def _snapshot_action_id(raw: object, name: str) -> str:
 
 
 def _snapshot_float(raw: object, name: str) -> float:
-    if not isinstance(raw, int | float | str):
+    if isinstance(raw, bool) or not isinstance(raw, int | float | str):
         raise ValueError(f"snapshot {name} must be numeric")
     value = float(raw)
     if not math.isfinite(value):
@@ -458,7 +458,7 @@ def _snapshot_float(raw: object, name: str) -> float:
 
 
 def _snapshot_int(raw: object, name: str) -> int:
-    if not isinstance(raw, int | str):
+    if isinstance(raw, bool) or not isinstance(raw, int | str):
         raise ValueError(f"snapshot {name} must be an integer")
     return int(raw)
 
