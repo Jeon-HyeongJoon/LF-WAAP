@@ -417,19 +417,35 @@ def _snapshot_transitions(raw: object) -> dict[str, dict[str, int]]:
         raise ValueError("snapshot transitions must be a mapping")
     transitions: dict[str, dict[str, int]] = {}
     for previous, next_actions in raw.items():
+        previous_action = _snapshot_action_id(previous, "transition source")
         if not isinstance(next_actions, Mapping):
             raise ValueError("snapshot transition rows must be mappings")
-        transitions[str(previous)] = {}
+        transitions[previous_action] = {}
         for current, count in next_actions.items():
+            current_action = _snapshot_action_id(current, "transition target")
             transition_count = _snapshot_int(count, "transition count")
-            transitions[str(previous)][str(current)] = transition_count
+            transitions[previous_action][current_action] = transition_count
     return transitions
 
 
 def _snapshot_actions(raw: object) -> tuple[str, ...]:
     if not isinstance(raw, list | tuple):
         raise ValueError("snapshot actions must be a list")
-    return tuple(str(action) for action in raw)
+    actions = tuple(_snapshot_action_id(action, "action") for action in raw)
+    if len(actions) != len(set(actions)):
+        raise ValueError("snapshot actions must not contain duplicate action ids")
+    return actions
+
+
+def _snapshot_action_id(raw: object, name: str) -> str:
+    if not isinstance(raw, str):
+        raise ValueError(f"snapshot {name} must be a string")
+    action_id = raw.strip()
+    if not action_id:
+        raise ValueError(f"snapshot {name} must be non-empty")
+    if action_id != raw:
+        raise ValueError(f"snapshot {name} must not contain surrounding whitespace")
+    return action_id
 
 
 def _snapshot_float(raw: object, name: str) -> float:

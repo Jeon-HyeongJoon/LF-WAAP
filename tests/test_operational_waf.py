@@ -761,6 +761,32 @@ def test_workflow_model_snapshot_rejects_negative_transition_count() -> None:
         )
 
 
+def test_workflow_model_snapshot_rejects_null_action_id() -> None:
+    with pytest.raises(ValueError, match="action"):
+        WorkflowModelSnapshot.from_dict(
+            {
+                "target_fpr": 0.01,
+                "alpha": 0.1,
+                "transitions": {"<START>": {"auto:shop:act_cart": 3}},
+                "actions": [None],
+                "threshold": -1.0,
+            }
+        )
+
+
+def test_workflow_model_snapshot_rejects_duplicate_action_ids() -> None:
+    with pytest.raises(ValueError, match="duplicate"):
+        WorkflowModelSnapshot.from_dict(
+            {
+                "target_fpr": 0.01,
+                "alpha": 0.1,
+                "transitions": {"<START>": {"auto:shop:act_cart": 3}},
+                "actions": ["auto:shop:act_cart", "auto:shop:act_cart"],
+                "threshold": -1.0,
+            }
+        )
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
