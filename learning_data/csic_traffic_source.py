@@ -12,10 +12,12 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from csic_to_packets import PacketRecord, iter_packets
 
 from waf.domain.model.flow import Direction, Flow
+from waf.domain.model.http_request import HttpRequest
 
 _DEFAULT_HTTP_PORT = 80
 
@@ -36,6 +38,26 @@ def record_to_flow(record: PacketRecord) -> Flow:
         port=_port_from_host(record.host),
         direction=Direction.INBOUND,
         payload=record.raw,
+    )
+
+
+def record_to_request(record: PacketRecord) -> HttpRequest:
+    """Map a reconstructed CSIC packet to the WAF's L7 request value object."""
+    head, _, body = record.raw.decode("latin-1").partition("\r\n\r\n")
+    lines = head.split("\r\n")
+    method, target, *_ = lines[0].split(" ")
+    split = urlsplit(target)
+    headers: dict[str, str] = {}
+    for line in lines[1:]:
+        name, sep, value = line.partition(":")
+        if sep:
+            headers[name] = value.strip()
+    return HttpRequest(
+        method=method,
+        path=split.path or "/",
+        query=split.query,
+        headers=headers,
+        body=body,
     )
 
 

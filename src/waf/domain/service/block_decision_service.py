@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from enum import Enum, auto
 
 from waf.domain.detector.detector import Detector
+from waf.domain.model.detection import DetectionSignal, SignalAction
 from waf.domain.model.http_request import HttpRequest
 from waf.domain.model.verdict import Verdict
 
@@ -42,4 +43,14 @@ class BlockDecisionService:
         else:  # BlockPolicy.ALL
             should_block = len(blocking) == len(signals)
 
-        return Verdict.block(signals) if should_block else Verdict.allow(signals)
+        if should_block:
+            return Verdict.block(signals)
+        return _non_blocking_verdict(signals)
+
+
+def _non_blocking_verdict(signals: tuple[DetectionSignal, ...]) -> Verdict:
+    if any(signal.action is SignalAction.CHALLENGE for signal in signals):
+        return Verdict.challenge(signals)
+    if any(signal.action is SignalAction.ALERT for signal in signals):
+        return Verdict.alert(signals)
+    return Verdict.allow(signals)

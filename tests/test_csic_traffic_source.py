@@ -39,6 +39,23 @@ def test_normal_yields_flows_from_benign_records(tmp_path) -> None:
     assert b"GET /a HTTP/1.1" in f.payload
 
 
+def test_record_to_request_parses_reconstructed_http_request(tmp_path) -> None:
+    row = (
+        "0,POST,localhost:8080,"
+        "id=3&nombre=Vino&cantidad=1,"
+        "http://localhost:8080/tienda1/publico/anadir.jsp?ref=home HTTP/1.1"
+    )
+    record = next(cts.iter_packets(_csv(tmp_path, [row])))
+
+    request = cts.record_to_request(record)
+
+    assert request.method == "POST"
+    assert request.path == "/tienda1/publico/anadir.jsp"
+    assert request.query == "ref=home"
+    assert request.headers["host"] == "localhost:8080"
+    assert request.body == "id=3&nombre=Vino&cantidad=1"
+
+
 def test_split_is_deterministic_disjoint_and_complete(tmp_path) -> None:
     path = _csv(tmp_path, [_normal(i) for i in range(10)])
     src = cts.CsicTrafficSource(path, validation_ratio=0.2)

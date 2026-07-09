@@ -11,9 +11,11 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from waf.domain.model.detection import DetectionSignal
 from waf.domain.model.flow import Direction, Flow, PacketMeta
 from waf.domain.model.http_request import HttpRequest
 from waf.domain.model.verdict import Verdict
+from waf.infrastructure.runtime import WafAuditRecord
 
 
 def _packet_to_dict(packet: PacketMeta) -> dict[str, object]:
@@ -107,20 +109,69 @@ def decode_request(message: bytes) -> HttpRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class SignalMessage:
+    detector: str
+    action: str
+    blocked: bool
+    reason: str
+    score: float
+
+
+@dataclass(frozen=True, slots=True)
 class VerdictMessage:
-    """판정 결과의 파이프용 요약(차단 여부 + 사유). 출력 토픽 소비측이 쓰기 쉽게 평탄화."""
+    """판정 결과의 파이프용 요약. 출력 토픽 소비측이 쓰기 쉽게 평탄화."""
 
     blocked: bool
-    decision: str  # "ALLOW" | "BLOCK"
+    decision: str
     reason: str
+    signals: tuple[SignalMessage, ...]
+    correlation_id: str = ""
+    tenant_id: str = ""
+    service_id: str = ""
+    runtime_version: str = ""
+    config_fingerprint: str = ""
 
 
-def encode_verdict(verdict: Verdict) -> bytes:
+def _signal_to_dict(signal: DetectionSignal) -> dict[str, object]:
+    return {
+        "detector": signal.detector,
+        "action": signal.action.value,
+        "blocked": signal.blocked,
+        "reason": signal.reason,
+        "score": signal.score,
+    }
+
+
+def _signal_from_dict(document: dict[str, Any]) -> SignalMessage:
+    return SignalMessage(
+        detector=str(document["detector"]),
+        action=str(document["action"]),
+        blocked=bool(document["blocked"]),
+        reason=str(document["reason"]),
+        score=float(document["score"]),
+    )
+
+
+def encode_verdict(
+    verdict: Verdict,
+    *,
+    correlation_id: str = "",
+    tenant_id: str = "",
+    service_id: str = "",
+    runtime_version: str = "",
+    config_fingerprint: str = "",
+) -> bytes:
     """Verdict → JSON 바이트. 판정 결과 토픽(waf.inspect.verdicts)에 싣는다."""
     document = {
+        "correlation_id": correlation_id,
+        "tenant_id": tenant_id,
+        "service_id": service_id,
+        "runtime_version": runtime_version,
+        "config_fingerprint": config_fingerprint,
         "blocked": verdict.is_blocked,
         "decision": verdict.decision.value,
         "reason": verdict.reason,
+        "signals": [_signal_to_dict(signal) for signal in verdict.signals],
     }
     return json.dumps(document).encode("utf-8")
 
@@ -132,4 +183,15 @@ def decode_verdict(message: bytes) -> VerdictMessage:
         blocked=bool(document["blocked"]),
         decision=str(document["decision"]),
         reason=str(document["reason"]),
+        signals=tuple(_signal_from_dict(signal) for signal in document.get("signals", ())),
+        correlation_id=str(document.get("correlation_id", "")),
+        tenant_id=str(document.get("tenant_id", "")),
+        service_id=str(document.get("service_id", "")),
+        runtime_version=str(document.get("runtime_version", "")),
+        config_fingerprint=str(document.get("config_fingerprint", "")),
     )
+
+
+def encode_audit_record(audit: WafAuditRecord) -> bytes:
+    """WafAuditRecord → JSON 바이트. 감사 토픽(waf.inspect.audit)에 싣는다."""
+    return json.dumps(audit.to_dict()).encode("utf-8")

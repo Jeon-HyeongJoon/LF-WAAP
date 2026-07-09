@@ -4,7 +4,7 @@
 payload는 임의 바이트라 base64로 싣는다(JSON 안전).
 """
 
-from waf.domain.model.detection import DetectionSignal
+from waf.domain.model.detection import DetectionSignal, SignalAction
 from waf.domain.model.flow import Direction, Flow, PacketMeta
 from waf.domain.model.http_request import HttpRequest
 from waf.domain.model.verdict import Verdict
@@ -76,3 +76,70 @@ def test_verdict_message_carries_decision_and_reason() -> None:
     assert message.blocked is True
     assert message.decision == "BLOCK"
     assert "SQLi" in message.reason
+
+
+def test_verdict_message_carries_operational_decision() -> None:
+    verdict = Verdict.challenge(
+        (
+            DetectionSignal(
+                "workflow",
+                blocked=False,
+                reason="transition anomaly",
+                score=2.0,
+                action=SignalAction.CHALLENGE,
+            ),
+        )
+    )
+
+    message = decode_verdict(encode_verdict(verdict))
+
+    assert message.blocked is False
+    assert message.decision == "CHALLENGE"
+    assert "transition anomaly" in message.reason
+
+
+def test_verdict_message_carries_structured_signal_details() -> None:
+    verdict = Verdict.alert(
+        (
+            DetectionSignal(
+                "workflow",
+                blocked=False,
+                reason="transition anomaly",
+                score=2.5,
+                action=SignalAction.ALERT,
+            ),
+            DetectionSignal("ruleset", blocked=False, reason="no rule matched", score=0.0),
+        )
+    )
+
+    message = decode_verdict(encode_verdict(verdict))
+
+    assert len(message.signals) == 2
+    assert message.signals[0].detector == "workflow"
+    assert message.signals[0].action == "ALERT"
+    assert message.signals[0].blocked is False
+    assert message.signals[0].score == 2.5
+    assert message.signals[0].reason == "transition anomaly"
+
+
+def test_verdict_message_carries_runtime_identity_metadata() -> None:
+    verdict = Verdict.block(
+        (DetectionSignal("ruleset", blocked=True, reason="SQLi pattern", score=1.0),)
+    )
+
+    message = decode_verdict(
+        encode_verdict(
+            verdict,
+            correlation_id="req-1",
+            tenant_id="tenant-a",
+            service_id="shop",
+            runtime_version="deploy-7",
+            config_fingerprint="cfg123",
+        )
+    )
+
+    assert message.correlation_id == "req-1"
+    assert message.tenant_id == "tenant-a"
+    assert message.service_id == "shop"
+    assert message.runtime_version == "deploy-7"
+    assert message.config_fingerprint == "cfg123"

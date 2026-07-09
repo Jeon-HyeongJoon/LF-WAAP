@@ -3,6 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
+
+
+class SignalAction(str, Enum):
+    ALLOW = "ALLOW"
+    ALERT = "ALERT"
+    CHALLENGE = "CHALLENGE"
+    BLOCK = "BLOCK"
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,3 +29,8 @@ class DetectionSignal:
     blocked: bool
     reason: str
     score: float = 0.0
+    action: SignalAction = SignalAction.ALLOW
+
+    def __post_init__(self) -> None:
+        if self.blocked and self.action is SignalAction.ALLOW:
+            object.__setattr__(self, "action", SignalAction.BLOCK)

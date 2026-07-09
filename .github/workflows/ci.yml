@@ -30,8 +30,17 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]"
 
+      - name: Run lint
+        run: python -m ruff check .
+
+      - name: Run type check
+        run: python -m mypy src learning_data
+
       - name: Run tests
         run: python -m pytest -q
+
+      - name: Run CSIC MVP smoke
+        run: python scripts/ci_csic_mvp.py --output-dir reports/ci/csic-mvp
 
       - name: Run HMM / Hybrid benchmark
         run: python scripts/ci_hmm_benchmark.py --output-dir reports/ci
@@ -39,6 +48,9 @@ jobs:
       - name: Publish benchmark summary
         if: always()
         run: |
+          if [ -f reports/ci/csic-mvp/csic_mvp_summary.md ]; then
+            cat reports/ci/csic-mvp/csic_mvp_summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
           if [ -f reports/ci/summary.md ]; then
             cat reports/ci/summary.md >> "$GITHUB_STEP_SUMMARY"
           fi
