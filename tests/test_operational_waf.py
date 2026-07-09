@@ -1080,7 +1080,23 @@ def test_operational_waf_rejects_detector_names_with_surrounding_whitespace() ->
             WafRuntimeConfig(
                 tenant_id="t1",
                 service_id="shop",
+                workflow_session_ttl_seconds=True,
+            ),
+            "workflow_session_ttl_seconds",
+        ),
+        (
+            WafRuntimeConfig(
+                tenant_id="t1",
+                service_id="shop",
                 workflow_max_sessions=0,
+            ),
+            "workflow_max_sessions",
+        ),
+        (
+            WafRuntimeConfig(
+                tenant_id="t1",
+                service_id="shop",
+                workflow_max_sessions=True,
             ),
             "workflow_max_sessions",
         ),
@@ -1125,6 +1141,14 @@ def test_operational_waf_rejects_detector_names_with_surrounding_whitespace() ->
                 tenant_id="t1",
                 service_id="shop",
                 metrics_max_cardinality=0,
+            ),
+            "metrics_max_cardinality",
+        ),
+        (
+            WafRuntimeConfig(
+                tenant_id="t1",
+                service_id="shop",
+                metrics_max_cardinality=True,
             ),
             "metrics_max_cardinality",
         ),

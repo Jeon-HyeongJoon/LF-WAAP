@@ -641,12 +641,11 @@ def _validate_config(config: WafRuntimeConfig) -> None:
     _validate_config_identity("runtime_version", config.runtime_version)
     _validate_config_identity("tenant_id", config.tenant_id)
     _validate_config_identity("service_id", config.service_id)
-    if config.workflow_session_ttl_seconds <= 0.0:
-        raise ValueError("workflow_session_ttl_seconds must be positive")
-    if config.workflow_max_sessions <= 0:
-        raise ValueError("workflow_max_sessions must be positive")
-    if config.metrics_max_cardinality <= 0:
-        raise ValueError("metrics_max_cardinality must be positive")
+    _validate_positive_number(
+        "workflow_session_ttl_seconds", config.workflow_session_ttl_seconds
+    )
+    _validate_positive_integer("workflow_max_sessions", config.workflow_max_sessions)
+    _validate_positive_integer("metrics_max_cardinality", config.metrics_max_cardinality)
     if config.workflow_model_path is not None and not config.enable_workflow:
         raise ValueError("workflow_model_path requires enable_workflow")
     if config.ruleset_path is not None and not config.enable_ruleset:
@@ -665,6 +664,20 @@ def _validate_config_identity(name: str, value: str) -> None:
         raise ValueError(f"{name} is required")
     if value != normalized:
         raise ValueError(f"{name} must not contain surrounding whitespace")
+
+
+def _validate_positive_number(name: str, value: object) -> None:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError(f"{name} must be numeric")
+    if value <= 0.0:
+        raise ValueError(f"{name} must be positive")
+
+
+def _validate_positive_integer(name: str, value: object) -> None:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{name} must be an integer")
+    if value <= 0:
+        raise ValueError(f"{name} must be positive")
 
 
 def _validate_artifact_file(name: str, path: str | Path) -> None:
