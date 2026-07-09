@@ -646,6 +646,8 @@ def _validate_config(config: WafRuntimeConfig) -> None:
     )
     _validate_positive_integer("workflow_max_sessions", config.workflow_max_sessions)
     _validate_positive_integer("metrics_max_cardinality", config.metrics_max_cardinality)
+    _validate_config_bool("enable_ruleset", config.enable_ruleset)
+    _validate_config_bool("enable_workflow", config.enable_workflow)
     if config.workflow_model_path is not None and not config.enable_workflow:
         raise ValueError("workflow_model_path requires enable_workflow")
     if config.ruleset_path is not None and not config.enable_ruleset:
@@ -678,6 +680,11 @@ def _validate_positive_integer(name: str, value: object) -> None:
         raise ValueError(f"{name} must be an integer")
     if value <= 0:
         raise ValueError(f"{name} must be positive")
+
+
+def _validate_config_bool(name: str, value: object) -> None:
+    if not isinstance(value, bool):
+        raise ValueError(f"{name} must be a boolean")
 
 
 def _validate_artifact_file(name: str, path: str | Path) -> None:
