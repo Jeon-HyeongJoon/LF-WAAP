@@ -761,6 +761,29 @@ def test_workflow_model_snapshot_rejects_negative_transition_count() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("alpha", "Infinity"),
+        ("threshold", "NaN"),
+    ],
+)
+def test_workflow_model_snapshot_rejects_non_finite_numeric_values(
+    field: str, value: str
+) -> None:
+    document = {
+        "target_fpr": 0.01,
+        "alpha": 0.1,
+        "transitions": {"<START>": {"auto:shop:act_cart": 3}},
+        "actions": ["auto:shop:act_cart"],
+        "threshold": -1.0,
+    }
+    document[field] = value
+
+    with pytest.raises(ValueError, match=field):
+        WorkflowModelSnapshot.from_dict(document)
+
+
 def test_workflow_model_artifact_load_rejects_untrained_model(tmp_path) -> None:
     artifact_path = tmp_path / "workflow-model.json"
     WorkflowModelSnapshot(

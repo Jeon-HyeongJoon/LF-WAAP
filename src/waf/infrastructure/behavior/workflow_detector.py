@@ -435,7 +435,10 @@ def _snapshot_actions(raw: object) -> tuple[str, ...]:
 def _snapshot_float(raw: object, name: str) -> float:
     if not isinstance(raw, int | float | str):
         raise ValueError(f"snapshot {name} must be numeric")
-    return float(raw)
+    value = float(raw)
+    if not math.isfinite(value):
+        raise ValueError(f"snapshot {name} must be finite")
+    return value
 
 
 def _snapshot_int(raw: object, name: str) -> int:
