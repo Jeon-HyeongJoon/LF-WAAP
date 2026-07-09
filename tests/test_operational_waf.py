@@ -974,13 +974,33 @@ def test_operational_waf_rejects_detector_names_with_surrounding_whitespace() ->
     [
         (WafRuntimeConfig(tenant_id="", service_id="shop"), "tenant_id"),
         (WafRuntimeConfig(tenant_id="   ", service_id="shop"), "tenant_id"),
+        (WafRuntimeConfig(tenant_id=" t1", service_id="shop"), "tenant_id"),
+        (WafRuntimeConfig(tenant_id="t1 ", service_id="shop"), "tenant_id"),
         (WafRuntimeConfig(tenant_id="t1", service_id=""), "service_id"),
         (WafRuntimeConfig(tenant_id="t1", service_id="\t"), "service_id"),
+        (WafRuntimeConfig(tenant_id="t1", service_id=" shop"), "service_id"),
+        (WafRuntimeConfig(tenant_id="t1", service_id="shop "), "service_id"),
         (
             WafRuntimeConfig(
                 tenant_id="t1",
                 service_id="shop",
                 runtime_version=" ",
+            ),
+            "runtime_version",
+        ),
+        (
+            WafRuntimeConfig(
+                tenant_id="t1",
+                service_id="shop",
+                runtime_version=" deploy-1",
+            ),
+            "runtime_version",
+        ),
+        (
+            WafRuntimeConfig(
+                tenant_id="t1",
+                service_id="shop",
+                runtime_version="deploy-1 ",
             ),
             "runtime_version",
         ),

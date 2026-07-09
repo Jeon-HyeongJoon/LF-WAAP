@@ -638,12 +638,9 @@ def _env_enum(
 
 
 def _validate_config(config: WafRuntimeConfig) -> None:
-    if not config.runtime_version.strip():
-        raise ValueError("runtime_version is required")
-    if not config.tenant_id.strip():
-        raise ValueError("tenant_id is required")
-    if not config.service_id.strip():
-        raise ValueError("service_id is required")
+    _validate_config_identity("runtime_version", config.runtime_version)
+    _validate_config_identity("tenant_id", config.tenant_id)
+    _validate_config_identity("service_id", config.service_id)
     if config.workflow_session_ttl_seconds <= 0.0:
         raise ValueError("workflow_session_ttl_seconds must be positive")
     if config.workflow_max_sessions <= 0:
@@ -660,6 +657,14 @@ def _validate_config(config: WafRuntimeConfig) -> None:
         _validate_artifact_file("ruleset_path", config.ruleset_path)
     if not config.enable_ruleset and not config.enable_workflow:
         raise ValueError("at least one detector must be enabled")
+
+
+def _validate_config_identity(name: str, value: str) -> None:
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError(f"{name} is required")
+    if value != normalized:
+        raise ValueError(f"{name} must not contain surrounding whitespace")
 
 
 def _validate_artifact_file(name: str, path: str | Path) -> None:
