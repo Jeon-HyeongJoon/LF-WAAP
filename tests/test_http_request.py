@@ -36,3 +36,18 @@ def test_http_request_rejects_invalid_required_fields(
 def test_http_request_rejects_non_string_header_values() -> None:
     with pytest.raises(ValueError, match="headers"):
         HttpRequest(method="GET", path="/products", headers={"X-Retry": 1})
+
+
+@pytest.mark.parametrize(
+    ("field", "kwargs"),
+    [
+        ("query", {"query": 1}),
+        ("body", {"body": b"raw"}),
+        ("client_ip", {"client_ip": 123}),
+    ],
+)
+def test_http_request_rejects_non_string_optional_text_fields(
+    field: str, kwargs: dict[str, object]
+) -> None:
+    with pytest.raises(ValueError, match=field):
+        HttpRequest(method="GET", path="/products", **kwargs)

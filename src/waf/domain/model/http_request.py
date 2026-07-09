@@ -24,10 +24,16 @@ class HttpRequest:
         # Normalize headers into an immutable, lowercase-keyed mapping.
         method = _required_text(self.method, "method").upper()
         path = _required_text(self.path, "path")
+        query = _optional_text(self.query, "query")
+        body = _optional_text(self.body, "body")
+        client_ip = _optional_text(self.client_ip, "client_ip")
         normalized = _normalized_headers(self.headers)
         object.__setattr__(self, "headers", MappingProxyType(normalized))
         object.__setattr__(self, "method", method)
         object.__setattr__(self, "path", path)
+        object.__setattr__(self, "query", query)
+        object.__setattr__(self, "body", body)
+        object.__setattr__(self, "client_ip", client_ip)
 
     @property
     def inspectable_payload(self) -> str:
@@ -43,6 +49,12 @@ def _required_text(value: object, name: str) -> str:
         raise ValueError(f"request {name} is required")
     if value != normalized:
         raise ValueError(f"request {name} must not contain surrounding whitespace")
+    return value
+
+
+def _optional_text(value: object, name: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"request {name} must be a string")
     return value
 
 
