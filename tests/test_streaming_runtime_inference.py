@@ -73,6 +73,36 @@ def test_runtime_inspector_publishes_errors_and_continues_after_bad_message() ->
     assert len(channel.poll("waf.inspect.audit")) == 1
 
 
+def test_runtime_inspector_rejects_semantically_invalid_request_message() -> None:
+    channel = InMemoryChannel()
+    waf = OperationalWaf.from_config(WafRuntimeConfig(tenant_id="t1", service_id="shop"))
+    channel.publish(
+        "waf.inspect.requests",
+        json.dumps(
+            {
+                "method": "GET",
+                "path": None,
+                "query": "",
+                "headers": {},
+                "body": "",
+                "client_ip": "",
+            }
+        ).encode("utf-8"),
+    )
+
+    report = StreamingRuntimeInspector(channel, waf).run_report()
+
+    assert report.consumed == 1
+    assert report.inspected == 0
+    assert report.failed == 1
+    assert len(channel.poll("waf.inspect.verdicts")) == 0
+    assert len(channel.poll("waf.inspect.audit")) == 0
+    error = json.loads(channel.poll("waf.inspect.errors")[0])
+    assert error["stage"] == "decode_or_inspect"
+    assert error["message_type"] == "request"
+    assert "path" in error["error"]
+
+
 def test_runtime_inspector_error_records_have_schema_and_utc_timestamp() -> None:
     channel = InMemoryChannel()
     waf = OperationalWaf.from_config(WafRuntimeConfig(tenant_id="t1", service_id="shop"))

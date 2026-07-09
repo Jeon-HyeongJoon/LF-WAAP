@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -98,14 +99,43 @@ def encode_request(request: HttpRequest) -> bytes:
 def decode_request(message: bytes) -> HttpRequest:
     """JSON 바이트 → HttpRequest (encode_request의 역변환)."""
     document = json.loads(message)
+    if not isinstance(document, dict):
+        raise ValueError("request message must be a JSON object")
     return HttpRequest(
-        method=str(document["method"]),
-        path=str(document["path"]),
-        query=str(document["query"]),
-        headers=dict(document["headers"]),
-        body=str(document["body"]),
-        client_ip=str(document["client_ip"]),
+        method=_required_request_text(document, "method"),
+        path=_required_request_text(document, "path"),
+        query=_optional_request_text(document, "query"),
+        headers=_request_headers(document.get("headers", {})),
+        body=_optional_request_text(document, "body"),
+        client_ip=_optional_request_text(document, "client_ip"),
     )
+
+
+def _required_request_text(document: dict[str, Any], field: str) -> str:
+    value = document.get(field)
+    if not isinstance(value, str):
+        raise ValueError(f"request field must be a string: {field}")
+    if not value.strip():
+        raise ValueError(f"request field is required: {field}")
+    return value
+
+
+def _optional_request_text(document: dict[str, Any], field: str) -> str:
+    value = document.get(field, "")
+    if not isinstance(value, str):
+        raise ValueError(f"request field must be a string: {field}")
+    return value
+
+
+def _request_headers(value: object) -> dict[str, str]:
+    if not isinstance(value, Mapping):
+        raise ValueError("request field must be an object: headers")
+    headers: dict[str, str] = {}
+    for name, header_value in value.items():
+        if not isinstance(name, str) or not isinstance(header_value, str):
+            raise ValueError("request headers must contain string keys and values")
+        headers[name] = header_value
+    return headers
 
 
 @dataclass(frozen=True, slots=True)

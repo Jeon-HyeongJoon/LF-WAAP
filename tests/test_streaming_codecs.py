@@ -4,6 +4,10 @@
 payload는 임의 바이트라 base64로 싣는다(JSON 안전).
 """
 
+import json
+
+import pytest
+
 from waf.domain.model.detection import DetectionSignal, SignalAction
 from waf.domain.model.flow import Direction, Flow, PacketMeta
 from waf.domain.model.http_request import HttpRequest
@@ -64,6 +68,22 @@ def test_http_request_roundtrip_preserves_fields() -> None:
     restored = decode_request(encode_request(request))
 
     assert restored == request  # __post_init__ 정규화(대문자 메서드·소문자 헤더)까지 일치
+
+
+@pytest.mark.parametrize("field", ["method", "path"])
+def test_decode_request_rejects_null_required_request_fields(field: str) -> None:
+    document = {
+        "method": "GET",
+        "path": "/products",
+        "query": "",
+        "headers": {},
+        "body": "",
+        "client_ip": "",
+    }
+    document[field] = None
+
+    with pytest.raises(ValueError, match=field):
+        decode_request(json.dumps(document).encode("utf-8"))
 
 
 def test_verdict_message_carries_decision_and_reason() -> None:
