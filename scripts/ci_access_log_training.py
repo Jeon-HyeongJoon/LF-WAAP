@@ -17,7 +17,6 @@ sys.path.insert(0, str(ROOT / "learning_data"))
 
 from access_log_source import AccessLogTrainingDataset  # noqa: E402
 from waf.domain.model.http_request import HttpRequest  # noqa: E402
-from waf.domain.model.detection import SignalAction  # noqa: E402
 from waf.infrastructure.behavior import CanonicalEventMapper  # noqa: E402
 from waf.infrastructure.behavior.workflow_detector import (  # noqa: E402
     EnforcementMode,
@@ -103,16 +102,25 @@ def _assess_validation(
 ) -> dict[str, object]:
     inspected = 0
     alerts = 0
+    covered = 0
+    scores: list[float] = []
     for index, sequence in enumerate(validation_sequences):
         detector.reset_session(f"ci-validation-{index}")
         for request in sequence:
-            result = detector.inspect(request)
+            event = detector.map_request(request)
+            result = detector.assess_event(event)
             inspected += 1
-            alerts += int(result.action is not SignalAction.ALLOW)
+            alerts += int(result.blocked)
+            covered += int(result.covered)
+            scores.append(result.score)
     return {
         "inspected_requests": inspected,
+        "covered_requests": covered,
+        "coverage_rate": round(covered / inspected, 6) if inspected else 0.0,
         "alerts": alerts,
         "alert_rate": round(alerts / inspected, 6) if inspected else 0.0,
+        "avg_transition_score": round(sum(scores) / len(scores), 6) if scores else 0.0,
+        "min_transition_score": round(min(scores), 6) if scores else 0.0,
     }
 
 
@@ -167,7 +175,10 @@ def render_summary(metrics: dict[str, object]) -> str:
             f"- transition_count: {model.get('transition_count', 0)}",
             f"- model_fingerprint: {model.get('fingerprint', '')}",
             f"- validation_inspected_requests: {validation.get('inspected_requests', 0)}",
+            f"- validation_coverage_rate: {validation.get('coverage_rate', 0.0)}",
             f"- validation_alert_rate: {validation.get('alert_rate', 0.0)}",
+            f"- validation_avg_transition_score: {validation.get('avg_transition_score', 0.0)}",
+            f"- validation_min_transition_score: {validation.get('min_transition_score', 0.0)}",
             "",
         ]
     )
