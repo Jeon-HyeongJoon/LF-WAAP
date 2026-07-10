@@ -1,6 +1,8 @@
 import json
 from datetime import UTC, datetime
 
+import pytest
+
 from waf.domain.model.http_request import HttpRequest
 from waf.infrastructure.runtime import OperationalWaf, WafRuntimeConfig
 from waf.infrastructure.streaming.codecs import decode_verdict, encode_request
@@ -173,3 +175,12 @@ def test_runtime_inspector_can_limit_messages_per_run() -> None:
     assert report.inspected == 1
     assert len(channel.poll("waf.inspect.verdicts")) == 1
     assert len(channel.poll("waf.inspect.audit")) == 1
+
+
+def test_runtime_inspector_rejects_non_integer_message_limit() -> None:
+    channel = InMemoryChannel()
+    waf = OperationalWaf.from_config(WafRuntimeConfig(tenant_id="t1", service_id="shop"))
+
+    for max_messages in (True, 1.5, "1"):
+        with pytest.raises(ValueError, match="max_messages"):
+            StreamingRuntimeInspector(channel, waf).run_report(max_messages=max_messages)

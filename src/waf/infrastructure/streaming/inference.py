@@ -100,8 +100,11 @@ class StreamingRuntimeInspector:
         return self.run_report(max_messages=max_messages).consumed
 
     def run_report(self, *, max_messages: int | None = None) -> StreamingRunReport:
-        if max_messages is not None and max_messages < 0:
-            raise ValueError("max_messages must be non-negative")
+        if max_messages is not None:
+            if isinstance(max_messages, bool) or not isinstance(max_messages, int):
+                raise ValueError("max_messages must be a non-negative integer")
+            if max_messages < 0:
+                raise ValueError("max_messages must be a non-negative integer")
         consumed = 0
         inspected = 0
         failed = 0
