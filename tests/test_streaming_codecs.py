@@ -58,6 +58,19 @@ def test_labeled_flow_carries_normal_label() -> None:
     assert is_attack is False
 
 
+def test_labeled_flow_rejects_non_boolean_label() -> None:
+    document = json.loads(
+        encode_labeled_flow(
+            Flow("http", 80, Direction.INBOUND, b"GET /home"),
+            is_attack=False,
+        )
+    )
+    document["is_attack"] = "false"
+
+    with pytest.raises(ValueError, match="is_attack"):
+        decode_labeled_flow(json.dumps(document).encode("utf-8"))
+
+
 def test_http_request_roundtrip_preserves_fields() -> None:
     request = HttpRequest(
         method="post", path="/login", query="next=/home",

@@ -77,7 +77,10 @@ def encode_labeled_flow(flow: Flow, is_attack: bool) -> bytes:
 def decode_labeled_flow(message: bytes) -> tuple[Flow, bool]:
     """JSON 바이트 → (Flow, is_attack). 모델 테스트(평가) 토픽 소비용."""
     document = json.loads(message)
-    return _flow_from_dict(document), bool(document["is_attack"])
+    is_attack = document["is_attack"]
+    if not isinstance(is_attack, bool):
+        raise ValueError("labeled flow field must be a boolean: is_attack")
+    return _flow_from_dict(document), is_attack
 
 
 # --- 실시간 추론: HttpRequest(입력) / Verdict(출력) -------------------------
