@@ -227,13 +227,22 @@ def decode_verdict(message: bytes) -> VerdictMessage:
         blocked=_required_bool(document["blocked"], "blocked"),
         decision=_required_decision(document["decision"]),
         reason=str(document["reason"]),
-        signals=tuple(_signal_from_dict(signal) for signal in document.get("signals", ())),
+        signals=tuple(
+            _signal_from_dict(signal) for signal in _verdict_signals(document)
+        ),
         correlation_id=str(document.get("correlation_id", "")),
         tenant_id=str(document.get("tenant_id", "")),
         service_id=str(document.get("service_id", "")),
         runtime_version=str(document.get("runtime_version", "")),
         config_fingerprint=str(document.get("config_fingerprint", "")),
     )
+
+
+def _verdict_signals(document: dict[str, Any]) -> list[object]:
+    signals = document.get("signals", [])
+    if not isinstance(signals, list):
+        raise ValueError("verdict message field must be a list: signals")
+    return signals
 
 
 def _required_bool(value: object, field: str) -> bool:

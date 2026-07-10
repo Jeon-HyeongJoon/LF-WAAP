@@ -168,6 +168,27 @@ def test_verdict_message_rejects_unknown_decision() -> None:
         decode_verdict(json.dumps(document).encode("utf-8"))
 
 
+def test_verdict_message_rejects_non_list_signals() -> None:
+    document = json.loads(
+        encode_verdict(
+            Verdict.block(
+                (
+                    DetectionSignal(
+                        "ruleset",
+                        blocked=True,
+                        reason="SQLi pattern",
+                        score=1.0,
+                    ),
+                )
+            )
+        )
+    )
+    document["signals"] = {"detector": "ruleset"}
+
+    with pytest.raises(ValueError, match="signals"):
+        decode_verdict(json.dumps(document).encode("utf-8"))
+
+
 def test_verdict_message_rejects_non_boolean_signal_blocked_flag() -> None:
     document = json.loads(
         encode_verdict(
