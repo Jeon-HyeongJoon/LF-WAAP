@@ -27,12 +27,14 @@ def test_ci_access_log_training_reports_holdout_transition_quality(tmp_path) -> 
     validation = metrics["validation"]
     runtime_boot = metrics["runtime_boot"]
     calibration = metrics["calibration"]
+    operational = metrics["operational_assessment"]
     counterfactual = validation["counterfactual"]
     artifact_path = tmp_path / "reports" / "access_log_workflow_model.json"
 
     assert isinstance(validation, dict)
     assert isinstance(runtime_boot, dict)
     assert isinstance(calibration, dict)
+    assert isinstance(operational, dict)
     assert isinstance(counterfactual, dict)
     assert artifact_path.is_file()
     assert validation["inspected_requests"] > 0
@@ -45,7 +47,12 @@ def test_ci_access_log_training_reports_holdout_transition_quality(tmp_path) -> 
     assert counterfactual["alert_rate"] > validation["alert_rate"]
     assert counterfactual["avg_transition_score"] < validation["avg_transition_score"]
     assert calibration["selected_target_fpr"] == metrics["model"]["target_fpr"]
+    assert calibration["shadow_target_fpr"] in calibration["candidate_target_fprs"]
     assert len(calibration["profiles"]) == 3
+    assert operational["serving_target_fpr"] == calibration["selected_target_fpr"]
+    assert operational["shadow_target_fpr"] == calibration["shadow_target_fpr"]
+    assert operational["serving_score_separation"] > 0.0
+    assert operational["needs_labeled_attack_dataset"] is False
     assert runtime_boot["ready"] is True
     assert runtime_boot["serving_detectors"] == ["workflow"]
     assert runtime_boot["model_fingerprint_matched"] is True

@@ -82,6 +82,7 @@ def run(access_log: Path, output_dir: Path, *, max_records: int | None) -> dict[
     if selected_detector is None or selected_profile is None:
         raise RuntimeError("access log workflow training did not produce a candidate model")
 
+    shadow_profile = _best_shadow_profile(profiles)
     detector = selected_detector
     before_ready = selected_before_ready
     after_ready = detector.is_trained
@@ -118,8 +119,13 @@ def run(access_log: Path, output_dir: Path, *, max_records: int | None) -> dict[
             "candidate_target_fprs": list(TARGET_FPR_CANDIDATES),
             "max_selected_normal_alert_rate": MAX_SELECTED_NORMAL_ALERT_RATE,
             "selected_target_fpr": selected_profile["target_fpr"],
+            "shadow_target_fpr": shadow_profile["target_fpr"],
             "profiles": profiles,
         },
+        "operational_assessment": _operational_assessment(
+            selected_profile=selected_profile,
+            shadow_profile=shadow_profile,
+        ),
         "runtime_boot": runtime_boot,
     }
     if not after_ready or detector.action_count <= 0 or detector.transition_count <= 0:
@@ -176,6 +182,67 @@ def _profile_selection_key(profile: dict[str, object]) -> tuple[int, float, floa
         float(validation["score_separation"]),
         -normal_alert_rate,
     )
+
+
+def _best_shadow_profile(profiles: list[dict[str, object]]) -> dict[str, object]:
+    return max(
+        profiles,
+        key=lambda profile: (
+            _profile_validation_float(profile, "alert_rate_lift"),
+            _profile_validation_float(profile, "score_separation"),
+        ),
+    )
+
+
+def _operational_assessment(
+    *,
+    selected_profile: dict[str, object],
+    shadow_profile: dict[str, object],
+) -> dict[str, object]:
+    selected_validation = selected_profile["validation"]
+    shadow_validation = shadow_profile["validation"]
+    assert isinstance(selected_validation, dict)
+    assert isinstance(shadow_validation, dict)
+    selected_lift = float(selected_validation["alert_rate_lift"])
+    selected_separation = float(selected_validation["score_separation"])
+    shadow_lift = float(shadow_validation["alert_rate_lift"])
+    return {
+        "serving_target_fpr": selected_profile["target_fpr"],
+        "serving_normal_alert_rate": selected_validation["alert_rate"],
+        "serving_counterfactual_alert_rate": _counterfactual_alert_rate(
+            selected_validation
+        ),
+        "serving_alert_rate_lift": selected_lift,
+        "serving_score_separation": selected_separation,
+        "shadow_target_fpr": shadow_profile["target_fpr"],
+        "shadow_normal_alert_rate": shadow_validation["alert_rate"],
+        "shadow_counterfactual_alert_rate": _counterfactual_alert_rate(
+            shadow_validation
+        ),
+        "shadow_alert_rate_lift": shadow_lift,
+        "needs_labeled_attack_dataset": selected_lift <= 0.0,
+        "recommendation": _recommendation(selected_lift, shadow_lift),
+    }
+
+
+def _counterfactual_alert_rate(validation: dict[str, object]) -> float:
+    counterfactual = validation["counterfactual"]
+    assert isinstance(counterfactual, dict)
+    return float(counterfactual["alert_rate"])
+
+
+def _profile_validation_float(profile: dict[str, object], name: str) -> float:
+    validation = profile["validation"]
+    assert isinstance(validation, dict)
+    return float(validation[name])
+
+
+def _recommendation(selected_lift: float, shadow_lift: float) -> str:
+    if selected_lift > 0.0:
+        return "serving_profile_has_counterfactual_sensitivity"
+    if shadow_lift > 0.0:
+        return "keep_serving_profile_conservative_and_validate_shadow_profile_with_labeled_attacks"
+    return "collect_labeled_attack_or_incident_dataset_before_tightening_enforcement"
 
 
 def _verify_runtime_boot(snapshot_path: Path, expected_fingerprint: str) -> dict[str, object]:
@@ -291,12 +358,14 @@ def render_summary(metrics: dict[str, object]) -> str:
     model = metrics.get("model", {})
     validation = metrics.get("validation", {})
     calibration = metrics.get("calibration", {})
+    operational = metrics.get("operational_assessment", {})
     runtime_boot = metrics.get("runtime_boot", {})
     assert isinstance(dataset, dict)
     assert isinstance(training, dict)
     assert isinstance(model, dict)
     assert isinstance(validation, dict)
     assert isinstance(calibration, dict)
+    assert isinstance(operational, dict)
     assert isinstance(runtime_boot, dict)
     counterfactual = validation.get("counterfactual", {})
     assert isinstance(counterfactual, dict)
@@ -318,6 +387,7 @@ def render_summary(metrics: dict[str, object]) -> str:
             f"- baseline_ready: {training.get('baseline_ready', False)}",
             f"- trained_ready: {training.get('trained_ready', False)}",
             f"- selected_target_fpr: {calibration.get('selected_target_fpr', 0.0)}",
+            f"- shadow_target_fpr: {calibration.get('shadow_target_fpr', 0.0)}",
             f"- max_selected_normal_alert_rate: "
             f"{calibration.get('max_selected_normal_alert_rate', 0.0)}",
             f"- action_count: {model.get('action_count', 0)}",
@@ -337,6 +407,12 @@ def render_summary(metrics: dict[str, object]) -> str:
             f"- counterfactual_alert_rate: {counterfactual.get('alert_rate', 0.0)}",
             f"- counterfactual_avg_transition_score: "
             f"{counterfactual.get('avg_transition_score', 0.0)}",
+            f"- shadow_alert_rate_lift: {operational.get('shadow_alert_rate_lift', 0.0)}",
+            f"- shadow_counterfactual_alert_rate: "
+            f"{operational.get('shadow_counterfactual_alert_rate', 0.0)}",
+            f"- needs_labeled_attack_dataset: "
+            f"{operational.get('needs_labeled_attack_dataset', False)}",
+            f"- recommendation: {operational.get('recommendation', '')}",
             f"- runtime_boot_ready: {runtime_boot.get('ready', False)}",
             f"- runtime_boot_serving: {runtime_boot.get('serving', False)}",
             f"- runtime_boot_fingerprint_matched: "
