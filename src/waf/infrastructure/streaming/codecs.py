@@ -226,7 +226,7 @@ def decode_verdict(message: bytes) -> VerdictMessage:
     return VerdictMessage(
         blocked=_required_bool(document["blocked"], "blocked"),
         decision=_required_decision(document["decision"]),
-        reason=str(document["reason"]),
+        reason=_required_message_text(document["reason"], "reason"),
         signals=tuple(
             _signal_from_dict(signal) for signal in _verdict_signals(document)
         ),
@@ -253,6 +253,12 @@ def _verdict_signals(document: dict[str, Any]) -> list[dict[str, Any]]:
 def _required_bool(value: object, field: str) -> bool:
     if not isinstance(value, bool):
         raise ValueError(f"message field must be a boolean: {field}")
+    return value
+
+
+def _required_message_text(value: object, field: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"message field must be a string: {field}")
     return value
 
 
