@@ -74,3 +74,29 @@ def test_canonical_event_mapper_uses_hashed_cookie_session_before_client_ip() ->
     assert first.session_id != second.session_id
     assert first.session_id.startswith("cookie:JSESSIONID:")
     assert "secret-session-a" not in first.session_id
+
+
+def test_session_identity_can_include_user_agent_in_ip_fallback() -> None:
+    resolver = SessionIdentityResolver(include_user_agent_in_ip_fallback=True)
+    first = resolver.resolve(
+        HttpRequest(
+            "GET",
+            "/",
+            headers={"User-Agent": "browser-a"},
+            client_ip="203.0.113.10",
+        )
+    )
+    second = resolver.resolve(
+        HttpRequest(
+            "GET",
+            "/",
+            headers={"User-Agent": "browser-b"},
+            client_ip="203.0.113.10",
+        )
+    )
+
+    assert first.value != second.value
+    assert first.value.startswith("ip_ua:")
+    assert first.source == "client_ip_user_agent"
+    assert "203.0.113.10" not in first.value
+    assert "browser-a" not in first.value

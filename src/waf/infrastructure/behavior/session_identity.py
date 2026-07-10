@@ -23,9 +23,11 @@ class SessionIdentityResolver:
         *,
         header_names: tuple[str, ...] = ("x-session-id",),
         cookie_names: tuple[str, ...] = ("JSESSIONID", "SESSIONID", "sessionid", "sid"),
+        include_user_agent_in_ip_fallback: bool = False,
     ) -> None:
         self._header_names = tuple(name.lower() for name in header_names)
         self._cookie_names = cookie_names
+        self._include_user_agent_in_ip_fallback = include_user_agent_in_ip_fallback
 
     def resolve(self, request: HttpRequest) -> SessionIdentity:
         for header_name in self._header_names:
@@ -47,6 +49,13 @@ class SessionIdentityResolver:
                 )
 
         if request.client_ip:
+            if self._include_user_agent_in_ip_fallback:
+                user_agent = request.headers.get("user-agent", "").strip()
+                if user_agent:
+                    return SessionIdentity(
+                        f"ip_ua:{_fingerprint(request.client_ip + chr(10) + user_agent)}",
+                        "client_ip_user_agent",
+                    )
             return SessionIdentity(f"ip:{request.client_ip}", "client_ip")
         return SessionIdentity("__default__", "default")
 

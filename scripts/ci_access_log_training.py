@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT / "learning_data"))
 from access_log_source import AccessLogTrainingDataset  # noqa: E402
 from waf.domain.model.http_request import HttpRequest  # noqa: E402
 from waf.infrastructure.behavior import CanonicalEventMapper  # noqa: E402
+from waf.infrastructure.behavior.session_identity import SessionIdentityResolver  # noqa: E402
 from waf.infrastructure.behavior.workflow_detector import (  # noqa: E402
     EnforcementMode,
     WorkflowBehaviorDetector,
@@ -59,7 +60,11 @@ def run(access_log: Path, output_dir: Path, *, max_records: int | None) -> dict[
         raise RuntimeError(metrics["reason"])
 
     train_sequences, validation_sequences = split_sequences(dataset.sequences)
-    mapper = CanonicalEventMapper(tenant_id="ci", service_id="access-log")
+    mapper = CanonicalEventMapper(
+        tenant_id="ci",
+        service_id="access-log",
+        session_resolver=SessionIdentityResolver(include_user_agent_in_ip_fallback=True),
+    )
     detector = WorkflowBehaviorDetector(mapper=mapper, mode=EnforcementMode.ALERT)
 
     before_ready = detector.is_trained
@@ -136,14 +141,38 @@ def _assess_validation(
     detector: WorkflowBehaviorDetector,
     validation_sequences: tuple[tuple[HttpRequest, ...], ...],
 ) -> dict[str, object]:
+    normal = _assess_request_sequences(detector, validation_sequences)
+    disrupted_sequences = tuple(
+        _disrupt_sequence(sequence)
+        for sequence in validation_sequences
+        if len(sequence) >= 2
+    )
+    disrupted = _assess_request_sequences(detector, disrupted_sequences)
+    normal_avg = float(normal["avg_transition_score"])
+    disrupted_avg = float(disrupted["avg_transition_score"])
+    normal_alert_rate = float(normal["alert_rate"])
+    disrupted_alert_rate = float(disrupted["alert_rate"])
+    return {
+        **normal,
+        "counterfactual": disrupted,
+        "score_separation": round(normal_avg - disrupted_avg, 6),
+        "alert_rate_lift": round(disrupted_alert_rate - normal_alert_rate, 6),
+    }
+
+
+def _assess_request_sequences(
+    detector: WorkflowBehaviorDetector,
+    sequences: tuple[tuple[HttpRequest, ...], ...],
+) -> dict[str, object]:
     inspected = 0
     alerts = 0
     covered = 0
     scores: list[float] = []
-    for index, sequence in enumerate(validation_sequences):
-        detector.reset_session(f"ci-validation-{index}")
-        for request in sequence:
-            event = detector.map_request(request)
+    for sequence in sequences:
+        events = [detector.map_request(request) for request in sequence]
+        for event in events:
+            detector.reset_session(event.session_id)
+        for event in events:
             result = detector.assess_event(event)
             inspected += 1
             alerts += int(result.blocked)
@@ -158,6 +187,10 @@ def _assess_validation(
         "avg_transition_score": round(sum(scores) / len(scores), 6) if scores else 0.0,
         "min_transition_score": round(min(scores), 6) if scores else 0.0,
     }
+
+
+def _disrupt_sequence(sequence: tuple[HttpRequest, ...]) -> tuple[HttpRequest, ...]:
+    return tuple(reversed(sequence))
 
 
 def _write_outputs(output_dir: Path, metrics: dict[str, object]) -> None:
@@ -192,6 +225,8 @@ def render_summary(metrics: dict[str, object]) -> str:
     assert isinstance(model, dict)
     assert isinstance(validation, dict)
     assert isinstance(runtime_boot, dict)
+    counterfactual = validation.get("counterfactual", {})
+    assert isinstance(counterfactual, dict)
     return "\n".join(
         [
             "# Access Log Workflow Training",
@@ -218,6 +253,13 @@ def render_summary(metrics: dict[str, object]) -> str:
             f"- validation_alert_rate: {validation.get('alert_rate', 0.0)}",
             f"- validation_avg_transition_score: {validation.get('avg_transition_score', 0.0)}",
             f"- validation_min_transition_score: {validation.get('min_transition_score', 0.0)}",
+            f"- validation_score_separation: {validation.get('score_separation', 0.0)}",
+            f"- validation_alert_rate_lift: {validation.get('alert_rate_lift', 0.0)}",
+            f"- counterfactual_inspected_requests: "
+            f"{counterfactual.get('inspected_requests', 0)}",
+            f"- counterfactual_alert_rate: {counterfactual.get('alert_rate', 0.0)}",
+            f"- counterfactual_avg_transition_score: "
+            f"{counterfactual.get('avg_transition_score', 0.0)}",
             f"- runtime_boot_ready: {runtime_boot.get('ready', False)}",
             f"- runtime_boot_serving: {runtime_boot.get('serving', False)}",
             f"- runtime_boot_fingerprint_matched: "
