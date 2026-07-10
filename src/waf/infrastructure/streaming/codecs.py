@@ -15,8 +15,10 @@ from typing import Any
 from waf.domain.model.detection import DetectionSignal
 from waf.domain.model.flow import Direction, Flow, PacketMeta
 from waf.domain.model.http_request import HttpRequest
-from waf.domain.model.verdict import Verdict
+from waf.domain.model.verdict import Decision, Verdict
 from waf.infrastructure.runtime import WafAuditRecord
+
+VERDICT_DECISIONS = frozenset(decision.value for decision in Decision)
 
 
 def _packet_to_dict(packet: PacketMeta) -> dict[str, object]:
@@ -221,7 +223,7 @@ def decode_verdict(message: bytes) -> VerdictMessage:
     document = _json_object_from_message(message, "verdict")
     return VerdictMessage(
         blocked=_required_bool(document["blocked"], "blocked"),
-        decision=str(document["decision"]),
+        decision=_required_decision(document["decision"]),
         reason=str(document["reason"]),
         signals=tuple(_signal_from_dict(signal) for signal in document.get("signals", ())),
         correlation_id=str(document.get("correlation_id", "")),
@@ -235,6 +237,14 @@ def decode_verdict(message: bytes) -> VerdictMessage:
 def _required_bool(value: object, field: str) -> bool:
     if not isinstance(value, bool):
         raise ValueError(f"message field must be a boolean: {field}")
+    return value
+
+
+def _required_decision(value: object) -> str:
+    if not isinstance(value, str):
+        raise ValueError("message field must be a valid decision: decision")
+    if value not in VERDICT_DECISIONS:
+        raise ValueError("message field must be a valid decision: decision")
     return value
 
 

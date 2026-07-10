@@ -147,6 +147,27 @@ def test_verdict_message_rejects_non_object_message() -> None:
         decode_verdict(json.dumps(["not", "an", "object"]).encode("utf-8"))
 
 
+def test_verdict_message_rejects_unknown_decision() -> None:
+    document = json.loads(
+        encode_verdict(
+            Verdict.block(
+                (
+                    DetectionSignal(
+                        "ruleset",
+                        blocked=True,
+                        reason="SQLi pattern",
+                        score=1.0,
+                    ),
+                )
+            )
+        )
+    )
+    document["decision"] = "DROP"
+
+    with pytest.raises(ValueError, match="decision"):
+        decode_verdict(json.dumps(document).encode("utf-8"))
+
+
 def test_verdict_message_rejects_non_boolean_signal_blocked_flag() -> None:
     document = json.loads(
         encode_verdict(
