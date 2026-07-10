@@ -186,7 +186,7 @@ def _signal_from_dict(document: dict[str, Any]) -> SignalMessage:
     return SignalMessage(
         detector=str(document["detector"]),
         action=str(document["action"]),
-        blocked=bool(document["blocked"]),
+        blocked=_required_bool(document["blocked"], "signals.blocked"),
         reason=str(document["reason"]),
         score=float(document["score"]),
     )
