@@ -45,6 +45,9 @@ jobs:
       - name: Run HMM / Hybrid benchmark
         run: python scripts/ci_hmm_benchmark.py --output-dir reports/ci
 
+      - name: Train workflow from access log
+        run: python scripts/ci_access_log_training.py --output-dir reports/ci/access-log
+
       - name: Publish benchmark summary
         if: always()
         run: |
@@ -53,6 +56,9 @@ jobs:
           fi
           if [ -f reports/ci/summary.md ]; then
             cat reports/ci/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f reports/ci/access-log/access_log_training_summary.md ]; then
+            cat reports/ci/access-log/access_log_training_summary.md >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload benchmark artifacts
