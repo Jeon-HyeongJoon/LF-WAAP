@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import json
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -191,7 +192,7 @@ def _signal_from_dict(document: dict[str, Any]) -> SignalMessage:
         action=_required_signal_action(document["action"]),
         blocked=_required_bool(document["blocked"], "signals.blocked"),
         reason=str(document["reason"]),
-        score=float(document["score"]),
+        score=_required_finite_float(document["score"], "signals.score"),
     )
 
 
@@ -255,6 +256,18 @@ def _required_signal_action(value: object) -> str:
     if value not in SIGNAL_ACTIONS:
         raise ValueError("message field must be a valid signal action: signals.action")
     return value
+
+
+def _required_finite_float(value: object, field: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float | str):
+        raise ValueError(f"message field must be a finite number: {field}")
+    try:
+        number = float(value)
+    except ValueError as exc:
+        raise ValueError(f"message field must be a finite number: {field}") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"message field must be a finite number: {field}")
+    return number
 
 
 def encode_audit_record(audit: WafAuditRecord) -> bytes:

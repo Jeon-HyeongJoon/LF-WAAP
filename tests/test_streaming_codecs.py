@@ -210,6 +210,27 @@ def test_verdict_message_rejects_unknown_signal_action() -> None:
         decode_verdict(json.dumps(document).encode("utf-8"))
 
 
+def test_verdict_message_rejects_non_finite_signal_score() -> None:
+    document = json.loads(
+        encode_verdict(
+            Verdict.block(
+                (
+                    DetectionSignal(
+                        "ruleset",
+                        blocked=True,
+                        reason="SQLi pattern",
+                        score=1.0,
+                    ),
+                )
+            )
+        )
+    )
+    document["signals"][0]["score"] = "NaN"
+
+    with pytest.raises(ValueError, match="signals.score"):
+        decode_verdict(json.dumps(document).encode("utf-8"))
+
+
 def test_verdict_message_carries_operational_decision() -> None:
     verdict = Verdict.challenge(
         (
