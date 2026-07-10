@@ -71,6 +71,16 @@ def test_labeled_flow_rejects_non_boolean_label() -> None:
         decode_labeled_flow(json.dumps(document).encode("utf-8"))
 
 
+def test_decode_flow_rejects_non_object_message() -> None:
+    with pytest.raises(ValueError, match="flow"):
+        decode_flow(json.dumps(["not", "an", "object"]).encode("utf-8"))
+
+
+def test_decode_labeled_flow_rejects_non_object_message() -> None:
+    with pytest.raises(ValueError, match="labeled flow"):
+        decode_labeled_flow(json.dumps(["not", "an", "object"]).encode("utf-8"))
+
+
 def test_http_request_roundtrip_preserves_fields() -> None:
     request = HttpRequest(
         method="post", path="/login", query="next=/home",

@@ -64,7 +64,7 @@ def encode_flow(flow: Flow) -> bytes:
 
 def decode_flow(message: bytes) -> Flow:
     """JSON 바이트 → Flow (encode_flow의 역변환)."""
-    return _flow_from_dict(json.loads(message))
+    return _flow_from_dict(_json_object_from_message(message, "flow"))
 
 
 def encode_labeled_flow(flow: Flow, is_attack: bool) -> bytes:
@@ -76,11 +76,18 @@ def encode_labeled_flow(flow: Flow, is_attack: bool) -> bytes:
 
 def decode_labeled_flow(message: bytes) -> tuple[Flow, bool]:
     """JSON 바이트 → (Flow, is_attack). 모델 테스트(평가) 토픽 소비용."""
-    document = json.loads(message)
+    document = _json_object_from_message(message, "labeled flow")
     is_attack = document["is_attack"]
     if not isinstance(is_attack, bool):
         raise ValueError("labeled flow field must be a boolean: is_attack")
     return _flow_from_dict(document), is_attack
+
+
+def _json_object_from_message(message: bytes, message_type: str) -> dict[str, Any]:
+    document = json.loads(message)
+    if not isinstance(document, dict):
+        raise ValueError(f"{message_type} message must be a JSON object")
+    return document
 
 
 # --- 실시간 추론: HttpRequest(입력) / Verdict(출력) -------------------------
