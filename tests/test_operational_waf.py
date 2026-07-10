@@ -1120,6 +1120,22 @@ def test_operational_waf_rejects_detector_names_with_surrounding_whitespace() ->
             WafRuntimeConfig(
                 tenant_id="t1",
                 service_id="shop",
+                workflow_mode="BLOCK",
+            ),
+            "workflow_mode",
+        ),
+        (
+            WafRuntimeConfig(
+                tenant_id="t1",
+                service_id="shop",
+                block_policy="ANY",
+            ),
+            "block_policy",
+        ),
+        (
+            WafRuntimeConfig(
+                tenant_id="t1",
+                service_id="shop",
                 enable_ruleset=False,
                 enable_workflow=False,
             ),

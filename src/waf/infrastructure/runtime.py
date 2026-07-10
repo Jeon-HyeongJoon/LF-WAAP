@@ -648,6 +648,8 @@ def _validate_config(config: WafRuntimeConfig) -> None:
     _validate_positive_integer("metrics_max_cardinality", config.metrics_max_cardinality)
     _validate_config_bool("enable_ruleset", config.enable_ruleset)
     _validate_config_bool("enable_workflow", config.enable_workflow)
+    _validate_config_enum("workflow_mode", config.workflow_mode, EnforcementMode)
+    _validate_config_enum("block_policy", config.block_policy, BlockPolicy)
     if config.workflow_model_path is not None and not config.enable_workflow:
         raise ValueError("workflow_model_path requires enable_workflow")
     if config.ruleset_path is not None and not config.enable_ruleset:
@@ -685,6 +687,11 @@ def _validate_positive_integer(name: str, value: object) -> None:
 def _validate_config_bool(name: str, value: object) -> None:
     if not isinstance(value, bool):
         raise ValueError(f"{name} must be a boolean")
+
+
+def _validate_config_enum(name: str, value: object, enum_type: type[Enum]) -> None:
+    if not isinstance(value, enum_type):
+        raise ValueError(f"{name} must be a {enum_type.__name__}")
 
 
 def _validate_artifact_file(name: str, path: str | Path) -> None:
