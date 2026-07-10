@@ -22,6 +22,7 @@ from waf.infrastructure.behavior.workflow_detector import (  # noqa: E402
     EnforcementMode,
     WorkflowBehaviorDetector,
 )
+from waf.infrastructure.runtime import OperationalWaf, WafRuntimeConfig  # noqa: E402
 
 
 def split_sequences(
@@ -65,8 +66,11 @@ def run(access_log: Path, output_dir: Path, *, max_records: int | None) -> dict[
     detector.train_request_sequences(train_sequences, validation_sequences)
     after_ready = detector.is_trained
     snapshot = detector.export_model_snapshot()
+    snapshot_path = output_dir / "access_log_workflow_model.json"
+    snapshot.save(snapshot_path)
 
     validation_assessments = _assess_validation(detector, validation_sequences)
+    runtime_boot = _verify_runtime_boot(snapshot_path, snapshot.fingerprint)
     elapsed = time.perf_counter() - started
     metrics = {
         "dataset_present": True,
@@ -86,14 +90,46 @@ def run(access_log: Path, output_dir: Path, *, max_records: int | None) -> dict[
             "transition_count": detector.transition_count,
             "threshold": detector.threshold,
             "fingerprint": snapshot.fingerprint,
+            "artifact_path": str(snapshot_path),
         },
         "validation": validation_assessments,
+        "runtime_boot": runtime_boot,
     }
     if not after_ready or detector.action_count <= 0 or detector.transition_count <= 0:
         _write_outputs(output_dir, metrics)
         raise RuntimeError("access log workflow training did not produce a ready model")
     _write_outputs(output_dir, metrics)
     return metrics
+
+
+def _verify_runtime_boot(snapshot_path: Path, expected_fingerprint: str) -> dict[str, object]:
+    waf = OperationalWaf.from_config(
+        WafRuntimeConfig(
+            tenant_id="ci",
+            service_id="access-log",
+            runtime_version="ci-access-log",
+            workflow_mode=EnforcementMode.ALERT,
+            workflow_model_path=snapshot_path,
+            enable_ruleset=False,
+        )
+    )
+    status = waf.status().to_dict()
+    detectors = status["detectors"]
+    assert isinstance(detectors, dict)
+    workflow = detectors["workflow"]
+    assert isinstance(workflow, dict)
+    metadata = workflow["metadata"]
+    assert isinstance(metadata, dict)
+    model_fingerprint = metadata["model_fingerprint"]
+    return {
+        "ready": status["ready"],
+        "serving": status["serving"],
+        "serving_detectors": status["serving_detectors"],
+        "degraded_detectors": status["degraded_detectors"],
+        "runtime_version": status["runtime_version"],
+        "model_fingerprint": model_fingerprint,
+        "model_fingerprint_matched": model_fingerprint == expected_fingerprint,
+    }
 
 
 def _assess_validation(
@@ -150,10 +186,12 @@ def render_summary(metrics: dict[str, object]) -> str:
     training = metrics.get("training", {})
     model = metrics.get("model", {})
     validation = metrics.get("validation", {})
+    runtime_boot = metrics.get("runtime_boot", {})
     assert isinstance(dataset, dict)
     assert isinstance(training, dict)
     assert isinstance(model, dict)
     assert isinstance(validation, dict)
+    assert isinstance(runtime_boot, dict)
     return "\n".join(
         [
             "# Access Log Workflow Training",
@@ -174,11 +212,16 @@ def render_summary(metrics: dict[str, object]) -> str:
             f"- action_count: {model.get('action_count', 0)}",
             f"- transition_count: {model.get('transition_count', 0)}",
             f"- model_fingerprint: {model.get('fingerprint', '')}",
+            f"- model_artifact_path: {model.get('artifact_path', '')}",
             f"- validation_inspected_requests: {validation.get('inspected_requests', 0)}",
             f"- validation_coverage_rate: {validation.get('coverage_rate', 0.0)}",
             f"- validation_alert_rate: {validation.get('alert_rate', 0.0)}",
             f"- validation_avg_transition_score: {validation.get('avg_transition_score', 0.0)}",
             f"- validation_min_transition_score: {validation.get('min_transition_score', 0.0)}",
+            f"- runtime_boot_ready: {runtime_boot.get('ready', False)}",
+            f"- runtime_boot_serving: {runtime_boot.get('serving', False)}",
+            f"- runtime_boot_fingerprint_matched: "
+            f"{runtime_boot.get('model_fingerprint_matched', False)}",
             "",
         ]
     )

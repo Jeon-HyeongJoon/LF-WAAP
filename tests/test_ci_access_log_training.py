@@ -25,9 +25,16 @@ def test_ci_access_log_training_reports_holdout_transition_quality(tmp_path) -> 
 
     metrics = run(access_log, tmp_path / "reports", max_records=None)
     validation = metrics["validation"]
+    runtime_boot = metrics["runtime_boot"]
+    artifact_path = tmp_path / "reports" / "access_log_workflow_model.json"
 
     assert isinstance(validation, dict)
+    assert isinstance(runtime_boot, dict)
+    assert artifact_path.is_file()
     assert validation["inspected_requests"] > 0
     assert validation["covered_requests"] == validation["inspected_requests"]
     assert validation["coverage_rate"] == 1.0
     assert validation["avg_transition_score"] < 0.0
+    assert runtime_boot["ready"] is True
+    assert runtime_boot["serving_detectors"] == ["workflow"]
+    assert runtime_boot["model_fingerprint_matched"] is True
