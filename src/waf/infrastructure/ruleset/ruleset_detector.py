@@ -27,7 +27,7 @@ class Rule:
         for field in ("id", "description", "pattern"):
             if field not in raw:
                 raise ValueError(f"ruleset rule is missing required field: {field}")
-        rule_id = _required_rule_text(raw, "id")
+        rule_id = _required_rule_id(raw)
         description = _required_rule_text(raw, "description")
         pattern = _required_rule_text(raw, "pattern")
         try:
@@ -104,6 +104,13 @@ def _required_rule_text(raw: dict[str, Any], field: str) -> str:
     if not value.strip():
         raise ValueError(f"ruleset rule has blank required field: {field}")
     return value
+
+
+def _required_rule_id(raw: dict[str, Any]) -> str:
+    rule_id = _required_rule_text(raw, "id")
+    if rule_id != rule_id.strip():
+        raise ValueError("ruleset rule id must not contain surrounding whitespace")
+    return rule_id
 
 
 def _validate_unique_rule_ids(rules: list[Rule]) -> None:

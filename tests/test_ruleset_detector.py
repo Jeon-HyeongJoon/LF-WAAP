@@ -118,6 +118,22 @@ rules:
         RuleSetDetector.from_yaml(path)
 
 
+def test_ruleset_loader_rejects_rule_id_with_surrounding_whitespace(tmp_path) -> None:
+    path = tmp_path / "rules.yaml"
+    path.write_text(
+        """
+rules:
+  - id: " CUSTOM-ADMIN "
+    description: custom admin path block
+    pattern: "/internal-admin"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="id"):
+        RuleSetDetector.from_yaml(path)
+
+
 def test_ruleset_loader_rejects_declared_fingerprint_mismatch(tmp_path) -> None:
     path = tmp_path / "rules.yaml"
     path.write_text(
