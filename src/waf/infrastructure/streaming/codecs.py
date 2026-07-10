@@ -188,7 +188,7 @@ def _signal_to_dict(signal: DetectionSignal) -> dict[str, object]:
 
 def _signal_from_dict(document: dict[str, Any]) -> SignalMessage:
     return SignalMessage(
-        detector=str(document["detector"]),
+        detector=_required_message_text(document["detector"], "signals.detector"),
         action=_required_signal_action(document["action"]),
         blocked=_required_bool(document["blocked"], "signals.blocked"),
         reason=str(document["reason"]),

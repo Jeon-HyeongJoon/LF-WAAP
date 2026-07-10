@@ -231,6 +231,27 @@ def test_verdict_message_rejects_non_object_signal() -> None:
         decode_verdict(json.dumps(document).encode("utf-8"))
 
 
+def test_verdict_message_rejects_non_string_signal_detector() -> None:
+    document = json.loads(
+        encode_verdict(
+            Verdict.block(
+                (
+                    DetectionSignal(
+                        "ruleset",
+                        blocked=True,
+                        reason="SQLi pattern",
+                        score=1.0,
+                    ),
+                )
+            )
+        )
+    )
+    document["signals"][0]["detector"] = None
+
+    with pytest.raises(ValueError, match="signals.detector"):
+        decode_verdict(json.dumps(document).encode("utf-8"))
+
+
 def test_verdict_message_rejects_non_boolean_signal_blocked_flag() -> None:
     document = json.loads(
         encode_verdict(
