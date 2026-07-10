@@ -238,11 +238,16 @@ def decode_verdict(message: bytes) -> VerdictMessage:
     )
 
 
-def _verdict_signals(document: dict[str, Any]) -> list[object]:
+def _verdict_signals(document: dict[str, Any]) -> list[dict[str, Any]]:
     signals = document.get("signals", [])
     if not isinstance(signals, list):
         raise ValueError("verdict message field must be a list: signals")
-    return signals
+    parsed: list[dict[str, Any]] = []
+    for signal in signals:
+        if not isinstance(signal, dict):
+            raise ValueError("verdict message field must contain objects: signals")
+        parsed.append(signal)
+    return parsed
 
 
 def _required_bool(value: object, field: str) -> bool:
