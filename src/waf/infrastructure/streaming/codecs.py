@@ -218,7 +218,7 @@ def encode_verdict(
 
 def decode_verdict(message: bytes) -> VerdictMessage:
     """JSON 바이트 → VerdictMessage (판정 요약)."""
-    document = json.loads(message)
+    document = _json_object_from_message(message, "verdict")
     return VerdictMessage(
         blocked=_required_bool(document["blocked"], "blocked"),
         decision=str(document["decision"]),
