@@ -696,7 +696,9 @@ def _validate_config_enum(name: str, value: object, enum_type: type[Enum]) -> No
         raise ValueError(f"{name} must be a {enum_type.__name__}")
 
 
-def _validate_artifact_file(name: str, path: str | Path) -> None:
+def _validate_artifact_file(name: str, path: object) -> None:
+    if not isinstance(path, (str, Path)):
+        raise ValueError(f"{name} must be a filesystem path")
     artifact_path = Path(path)
     if not artifact_path.is_file():
         raise ValueError(f"{name} must point to a readable file: {artifact_path}")
