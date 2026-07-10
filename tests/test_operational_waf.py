@@ -1036,14 +1036,24 @@ def test_operational_waf_rejects_detector_names_with_surrounding_whitespace() ->
 @pytest.mark.parametrize(
     ("config", "message"),
     [
+        (WafRuntimeConfig(tenant_id=1, service_id="shop"), "tenant_id"),
         (WafRuntimeConfig(tenant_id="", service_id="shop"), "tenant_id"),
         (WafRuntimeConfig(tenant_id="   ", service_id="shop"), "tenant_id"),
         (WafRuntimeConfig(tenant_id=" t1", service_id="shop"), "tenant_id"),
         (WafRuntimeConfig(tenant_id="t1 ", service_id="shop"), "tenant_id"),
+        (WafRuntimeConfig(tenant_id="t1", service_id=None), "service_id"),
         (WafRuntimeConfig(tenant_id="t1", service_id=""), "service_id"),
         (WafRuntimeConfig(tenant_id="t1", service_id="\t"), "service_id"),
         (WafRuntimeConfig(tenant_id="t1", service_id=" shop"), "service_id"),
         (WafRuntimeConfig(tenant_id="t1", service_id="shop "), "service_id"),
+        (
+            WafRuntimeConfig(
+                tenant_id="t1",
+                service_id="shop",
+                runtime_version=3,
+            ),
+            "runtime_version",
+        ),
         (
             WafRuntimeConfig(
                 tenant_id="t1",

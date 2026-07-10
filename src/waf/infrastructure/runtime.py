@@ -662,7 +662,9 @@ def _validate_config(config: WafRuntimeConfig) -> None:
         raise ValueError("at least one detector must be enabled")
 
 
-def _validate_config_identity(name: str, value: str) -> None:
+def _validate_config_identity(name: str, value: object) -> None:
+    if not isinstance(value, str):
+        raise ValueError(f"{name} must be a string")
     normalized = value.strip()
     if not normalized:
         raise ValueError(f"{name} is required")
