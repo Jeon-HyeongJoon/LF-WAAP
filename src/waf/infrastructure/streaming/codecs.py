@@ -12,13 +12,14 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from waf.domain.model.detection import DetectionSignal
+from waf.domain.model.detection import DetectionSignal, SignalAction
 from waf.domain.model.flow import Direction, Flow, PacketMeta
 from waf.domain.model.http_request import HttpRequest
 from waf.domain.model.verdict import Decision, Verdict
 from waf.infrastructure.runtime import WafAuditRecord
 
 VERDICT_DECISIONS = frozenset(decision.value for decision in Decision)
+SIGNAL_ACTIONS = frozenset(action.value for action in SignalAction)
 
 
 def _packet_to_dict(packet: PacketMeta) -> dict[str, object]:
@@ -187,7 +188,7 @@ def _signal_to_dict(signal: DetectionSignal) -> dict[str, object]:
 def _signal_from_dict(document: dict[str, Any]) -> SignalMessage:
     return SignalMessage(
         detector=str(document["detector"]),
-        action=str(document["action"]),
+        action=_required_signal_action(document["action"]),
         blocked=_required_bool(document["blocked"], "signals.blocked"),
         reason=str(document["reason"]),
         score=float(document["score"]),
@@ -245,6 +246,14 @@ def _required_decision(value: object) -> str:
         raise ValueError("message field must be a valid decision: decision")
     if value not in VERDICT_DECISIONS:
         raise ValueError("message field must be a valid decision: decision")
+    return value
+
+
+def _required_signal_action(value: object) -> str:
+    if not isinstance(value, str):
+        raise ValueError("message field must be a valid signal action: signals.action")
+    if value not in SIGNAL_ACTIONS:
+        raise ValueError("message field must be a valid signal action: signals.action")
     return value
 
 
