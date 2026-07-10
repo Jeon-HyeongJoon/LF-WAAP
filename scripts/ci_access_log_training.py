@@ -22,8 +22,12 @@ from waf.infrastructure.behavior.session_identity import SessionIdentityResolver
 from waf.infrastructure.behavior.workflow_detector import (  # noqa: E402
     EnforcementMode,
     WorkflowBehaviorDetector,
+    WorkflowTransitionModel,
 )
 from waf.infrastructure.runtime import OperationalWaf, WafRuntimeConfig  # noqa: E402
+
+TARGET_FPR_CANDIDATES = (0.01, 0.02, 0.05)
+MAX_SELECTED_NORMAL_ALERT_RATE = 0.02
 
 
 def split_sequences(
@@ -60,21 +64,32 @@ def run(access_log: Path, output_dir: Path, *, max_records: int | None) -> dict[
         raise RuntimeError(metrics["reason"])
 
     train_sequences, validation_sequences = split_sequences(dataset.sequences)
-    mapper = CanonicalEventMapper(
-        tenant_id="ci",
-        service_id="access-log",
-        session_resolver=SessionIdentityResolver(include_user_agent_in_ip_fallback=True),
-    )
-    detector = WorkflowBehaviorDetector(mapper=mapper, mode=EnforcementMode.ALERT)
+    profiles: list[dict[str, object]] = []
+    selected_detector: WorkflowBehaviorDetector | None = None
+    selected_before_ready = False
+    selected_profile: dict[str, object] | None = None
+    for target_fpr in TARGET_FPR_CANDIDATES:
+        detector = _new_detector(target_fpr=target_fpr)
+        before_ready = detector.is_trained
+        detector.train_request_sequences(train_sequences, validation_sequences)
+        profile = _profile_detector(detector, validation_sequences, target_fpr)
+        profiles.append(profile)
+        if selected_profile is None or _is_better_profile(profile, selected_profile):
+            selected_detector = detector
+            selected_before_ready = before_ready
+            selected_profile = profile
 
-    before_ready = detector.is_trained
-    detector.train_request_sequences(train_sequences, validation_sequences)
+    if selected_detector is None or selected_profile is None:
+        raise RuntimeError("access log workflow training did not produce a candidate model")
+
+    detector = selected_detector
+    before_ready = selected_before_ready
     after_ready = detector.is_trained
     snapshot = detector.export_model_snapshot()
     snapshot_path = output_dir / "access_log_workflow_model.json"
     snapshot.save(snapshot_path)
 
-    validation_assessments = _assess_validation(detector, validation_sequences)
+    validation_assessments = selected_profile["validation"]
     runtime_boot = _verify_runtime_boot(snapshot_path, snapshot.fingerprint)
     elapsed = time.perf_counter() - started
     metrics = {
@@ -94,10 +109,17 @@ def run(access_log: Path, output_dir: Path, *, max_records: int | None) -> dict[
             "action_count": detector.action_count,
             "transition_count": detector.transition_count,
             "threshold": detector.threshold,
+            "target_fpr": selected_profile["target_fpr"],
             "fingerprint": snapshot.fingerprint,
             "artifact_path": str(snapshot_path),
         },
         "validation": validation_assessments,
+        "calibration": {
+            "candidate_target_fprs": list(TARGET_FPR_CANDIDATES),
+            "max_selected_normal_alert_rate": MAX_SELECTED_NORMAL_ALERT_RATE,
+            "selected_target_fpr": selected_profile["target_fpr"],
+            "profiles": profiles,
+        },
         "runtime_boot": runtime_boot,
     }
     if not after_ready or detector.action_count <= 0 or detector.transition_count <= 0:
@@ -105,6 +127,55 @@ def run(access_log: Path, output_dir: Path, *, max_records: int | None) -> dict[
         raise RuntimeError("access log workflow training did not produce a ready model")
     _write_outputs(output_dir, metrics)
     return metrics
+
+
+def _new_detector(*, target_fpr: float) -> WorkflowBehaviorDetector:
+    mapper = CanonicalEventMapper(
+        tenant_id="ci",
+        service_id="access-log",
+        session_resolver=SessionIdentityResolver(include_user_agent_in_ip_fallback=True),
+    )
+    return WorkflowBehaviorDetector(
+        mapper=mapper,
+        mode=EnforcementMode.ALERT,
+        model=WorkflowTransitionModel(target_fpr=target_fpr),
+    )
+
+
+def _profile_detector(
+    detector: WorkflowBehaviorDetector,
+    validation_sequences: tuple[tuple[HttpRequest, ...], ...],
+    target_fpr: float,
+) -> dict[str, object]:
+    return {
+        "target_fpr": target_fpr,
+        "threshold": detector.threshold,
+        "action_count": detector.action_count,
+        "transition_count": detector.transition_count,
+        "validation": _assess_validation(detector, validation_sequences),
+    }
+
+
+def _is_better_profile(
+    candidate: dict[str, object],
+    incumbent: dict[str, object],
+) -> bool:
+    candidate_key = _profile_selection_key(candidate)
+    incumbent_key = _profile_selection_key(incumbent)
+    return candidate_key > incumbent_key
+
+
+def _profile_selection_key(profile: dict[str, object]) -> tuple[int, float, float, float]:
+    validation = profile["validation"]
+    assert isinstance(validation, dict)
+    normal_alert_rate = float(validation["alert_rate"])
+    within_budget = int(normal_alert_rate <= MAX_SELECTED_NORMAL_ALERT_RATE)
+    return (
+        within_budget,
+        float(validation["alert_rate_lift"]),
+        float(validation["score_separation"]),
+        -normal_alert_rate,
+    )
 
 
 def _verify_runtime_boot(snapshot_path: Path, expected_fingerprint: str) -> dict[str, object]:
@@ -219,11 +290,13 @@ def render_summary(metrics: dict[str, object]) -> str:
     training = metrics.get("training", {})
     model = metrics.get("model", {})
     validation = metrics.get("validation", {})
+    calibration = metrics.get("calibration", {})
     runtime_boot = metrics.get("runtime_boot", {})
     assert isinstance(dataset, dict)
     assert isinstance(training, dict)
     assert isinstance(model, dict)
     assert isinstance(validation, dict)
+    assert isinstance(calibration, dict)
     assert isinstance(runtime_boot, dict)
     counterfactual = validation.get("counterfactual", {})
     assert isinstance(counterfactual, dict)
@@ -244,8 +317,12 @@ def render_summary(metrics: dict[str, object]) -> str:
             f"- validation_sessions: {training.get('validation_sessions', 0)}",
             f"- baseline_ready: {training.get('baseline_ready', False)}",
             f"- trained_ready: {training.get('trained_ready', False)}",
+            f"- selected_target_fpr: {calibration.get('selected_target_fpr', 0.0)}",
+            f"- max_selected_normal_alert_rate: "
+            f"{calibration.get('max_selected_normal_alert_rate', 0.0)}",
             f"- action_count: {model.get('action_count', 0)}",
             f"- transition_count: {model.get('transition_count', 0)}",
+            f"- model_target_fpr: {model.get('target_fpr', 0.0)}",
             f"- model_fingerprint: {model.get('fingerprint', '')}",
             f"- model_artifact_path: {model.get('artifact_path', '')}",
             f"- validation_inspected_requests: {validation.get('inspected_requests', 0)}",
