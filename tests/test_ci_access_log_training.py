@@ -56,3 +56,47 @@ def test_ci_access_log_training_reports_holdout_transition_quality(tmp_path) -> 
     assert runtime_boot["ready"] is True
     assert runtime_boot["serving_detectors"] == ["workflow"]
     assert runtime_boot["model_fingerprint_matched"] is True
+
+
+def test_ci_access_log_training_reports_generated_flow_map_and_rare_flows(
+    tmp_path,
+) -> None:
+    access_log = tmp_path / "access.log"
+    rows: list[str] = []
+    for session in range(1000):
+        ip = f"203.0.{session // 250}.{session % 250}"
+        agent = f"common-agent-{session}"
+        rows.extend(
+            [
+                _line(ip, agent, 0, "/"),
+                _line(ip, agent, 1, "/products/42"),
+                _line(ip, agent, 2, "/checkout"),
+            ]
+        )
+    rows.extend(
+        [
+            _line("198.51.100.10", "rare-agent", 0, "/"),
+            _line("198.51.100.10", "rare-agent", 1, "/admin/export"),
+            _line("198.51.100.10", "rare-agent", 2, "/checkout"),
+        ]
+    )
+    access_log.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+    metrics = run(access_log, tmp_path / "reports", max_records=None)
+    flow_distribution = metrics["flow_distribution"]
+    assert isinstance(flow_distribution, dict)
+    flow_map = flow_distribution["flow_type_map"]
+    assert isinstance(flow_map, list)
+
+    rare_flows: list[dict[str, object]] = []
+    for flow in flow_map:
+        assert isinstance(flow, dict)
+        if flow["is_rare"]:
+            rare_flows.append(flow)
+    assert flow_distribution["total_flows"] == 1001
+    assert flow_distribution["unique_flow_types"] == 2
+    assert flow_distribution["rare_probability_threshold"] == 0.001
+    assert flow_distribution["rare_flow_types"] == 1
+    assert flow_distribution["rare_flow_occurrences"] == 1
+    assert rare_flows[0]["count"] == 1
+    assert rare_flows[0]["probability"] == 0.000999

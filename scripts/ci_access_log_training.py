@@ -7,9 +7,11 @@ does not print raw access log lines or raw URL samples.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,6 +30,7 @@ from waf.infrastructure.runtime import OperationalWaf, WafRuntimeConfig  # noqa:
 
 TARGET_FPR_CANDIDATES = (0.01, 0.02, 0.05)
 MAX_SELECTED_NORMAL_ALERT_RATE = 0.02
+RARE_FLOW_PROBABILITY_THRESHOLD = 0.001
 
 
 def split_sequences(
@@ -91,6 +94,11 @@ def run(access_log: Path, output_dir: Path, *, max_records: int | None) -> dict[
     snapshot.save(snapshot_path)
 
     validation_assessments = selected_profile["validation"]
+    flow_distribution = _build_flow_distribution(
+        detector,
+        dataset.sequences,
+        rare_probability_threshold=RARE_FLOW_PROBABILITY_THRESHOLD,
+    )
     runtime_boot = _verify_runtime_boot(snapshot_path, snapshot.fingerprint)
     elapsed = time.perf_counter() - started
     metrics = {
@@ -115,6 +123,7 @@ def run(access_log: Path, output_dir: Path, *, max_records: int | None) -> dict[
             "artifact_path": str(snapshot_path),
         },
         "validation": validation_assessments,
+        "flow_distribution": flow_distribution,
         "calibration": {
             "candidate_target_fprs": list(TARGET_FPR_CANDIDATES),
             "max_selected_normal_alert_rate": MAX_SELECTED_NORMAL_ALERT_RATE,
@@ -146,6 +155,55 @@ def _new_detector(*, target_fpr: float) -> WorkflowBehaviorDetector:
         mode=EnforcementMode.ALERT,
         model=WorkflowTransitionModel(target_fpr=target_fpr),
     )
+
+
+def _build_flow_distribution(
+    detector: WorkflowBehaviorDetector,
+    sequences: tuple[tuple[HttpRequest, ...], ...],
+    *,
+    rare_probability_threshold: float,
+) -> dict[str, object]:
+    action_sequences = tuple(
+        tuple(detector.map_request(request).action_id for request in sequence)
+        for sequence in sequences
+    )
+    counts: Counter[tuple[str, ...]] = Counter(action_sequences)
+    total = sum(counts.values())
+    flow_rows: list[dict[str, object]] = []
+    for index, (action_sequence, count) in enumerate(
+        sorted(counts.items(), key=lambda item: (-item[1], item[0])),
+        start=1,
+    ):
+        probability = count / total if total else 0.0
+        flow_rows.append(
+            {
+                "flow_type_id": f"flow_{index:04d}",
+                "flow_hash": _flow_hash(action_sequence),
+                "count": count,
+                "probability": round(probability, 6),
+                "is_rare": probability <= rare_probability_threshold,
+                "step_count": len(action_sequence),
+                "action_sequence": list(action_sequence),
+            }
+        )
+    rare_rows = [row for row in flow_rows if bool(row["is_rare"])]
+    return {
+        "total_flows": total,
+        "unique_flow_types": len(flow_rows),
+        "rare_probability_threshold": rare_probability_threshold,
+        "rare_flow_types": len(rare_rows),
+        "rare_flow_occurrences": sum(int(row["count"]) for row in rare_rows),
+        "rare_probability_mass": round(
+            sum(float(row["probability"]) for row in rare_rows),
+            6,
+        ),
+        "flow_type_map": flow_rows,
+    }
+
+
+def _flow_hash(action_sequence: tuple[str, ...]) -> str:
+    encoded = "\n".join(action_sequence).encode("utf-8", errors="replace")
+    return hashlib.sha256(encoded).hexdigest()[:16]
 
 
 def _profile_detector(
@@ -357,6 +415,7 @@ def render_summary(metrics: dict[str, object]) -> str:
     training = metrics.get("training", {})
     model = metrics.get("model", {})
     validation = metrics.get("validation", {})
+    flow_distribution = metrics.get("flow_distribution", {})
     calibration = metrics.get("calibration", {})
     operational = metrics.get("operational_assessment", {})
     runtime_boot = metrics.get("runtime_boot", {})
@@ -364,11 +423,15 @@ def render_summary(metrics: dict[str, object]) -> str:
     assert isinstance(training, dict)
     assert isinstance(model, dict)
     assert isinstance(validation, dict)
+    assert isinstance(flow_distribution, dict)
     assert isinstance(calibration, dict)
     assert isinstance(operational, dict)
     assert isinstance(runtime_boot, dict)
     counterfactual = validation.get("counterfactual", {})
+    flow_type_map = flow_distribution.get("flow_type_map", [])
     assert isinstance(counterfactual, dict)
+    assert isinstance(flow_type_map, list)
+    flow_lines = _render_flow_type_map(flow_type_map)
     return "\n".join(
         [
             "# Access Log Workflow Training",
@@ -382,6 +445,16 @@ def render_summary(metrics: dict[str, object]) -> str:
             f"- session_count: {dataset.get('session_count', 0)}",
             f"- route_count: {dataset.get('route_count', 0)}",
             f"- avg_session_length: {dataset.get('avg_session_length', 0.0)}",
+            f"- flow_total: {flow_distribution.get('total_flows', 0)}",
+            f"- flow_type_count: {flow_distribution.get('unique_flow_types', 0)}",
+            f"- rare_flow_probability_threshold: "
+            f"{flow_distribution.get('rare_probability_threshold', 0.0)}",
+            f"- rare_flow_types: {flow_distribution.get('rare_flow_types', 0)}",
+            f"- rare_flow_occurrences: "
+            f"{flow_distribution.get('rare_flow_occurrences', 0)}",
+            f"- rare_flow_probability_mass: "
+            f"{flow_distribution.get('rare_probability_mass', 0.0)}",
+            *flow_lines,
             f"- train_sessions: {training.get('train_sessions', 0)}",
             f"- validation_sessions: {training.get('validation_sessions', 0)}",
             f"- baseline_ready: {training.get('baseline_ready', False)}",
@@ -420,6 +493,22 @@ def render_summary(metrics: dict[str, object]) -> str:
             "",
         ]
     )
+
+
+def _render_flow_type_map(flow_type_map: list[object]) -> list[str]:
+    lines = ["- flow_type_map:"]
+    for row in flow_type_map:
+        assert isinstance(row, dict)
+        lines.append(
+            "  - "
+            f"{row.get('flow_type_id', '')}: "
+            f"count={row.get('count', 0)}, "
+            f"probability={row.get('probability', 0.0)}, "
+            f"is_rare={row.get('is_rare', False)}, "
+            f"step_count={row.get('step_count', 0)}, "
+            f"flow_hash={row.get('flow_hash', '')}"
+        )
+    return lines
 
 
 def main() -> None:
