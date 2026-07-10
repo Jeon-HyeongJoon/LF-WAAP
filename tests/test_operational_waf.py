@@ -653,6 +653,28 @@ def test_workflow_model_artifact_load_rejects_context_with_surrounding_whitespac
         WorkflowModelSnapshot.load(artifact_path)
 
 
+@pytest.mark.parametrize("context_field", ["tenant_id", "service_id"])
+def test_workflow_model_artifact_load_rejects_non_string_context(
+    tmp_path, context_field: str
+) -> None:
+    trainer = WorkflowBehaviorDetector(
+        mapper=CanonicalEventMapper(tenant_id="t1", service_id="shop"),
+        mode=EnforcementMode.BLOCK,
+    )
+    trainer.train_request_sequences(
+        [_checkout(f"train-{i}") for i in range(8)],
+        [_checkout(f"val-{i}") for i in range(2)],
+    )
+    artifact_path = tmp_path / "workflow-model.json"
+    trainer.export_model_snapshot().save(artifact_path)
+    document = json.loads(artifact_path.read_text(encoding="utf-8"))
+    document[context_field] = 123
+    artifact_path.write_text(json.dumps(document), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=context_field):
+        WorkflowModelSnapshot.load(artifact_path)
+
+
 def test_operational_waf_rejects_workflow_model_for_different_service(tmp_path) -> None:
     trainer = WorkflowBehaviorDetector(
         mapper=CanonicalEventMapper(tenant_id="t1", service_id="other-shop"),

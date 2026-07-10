@@ -484,7 +484,9 @@ def _validate_trained_snapshot(snapshot: WorkflowModelSnapshot) -> None:
 
 
 def _artifact_context_value(document: Mapping[str, object], name: str) -> str:
-    raw_value = str(document.get(name, ""))
+    raw_value = document.get(name, "")
+    if not isinstance(raw_value, str):
+        raise ValueError(f"workflow model artifact {name} must be a string")
     value = raw_value.strip()
     if not value:
         raise ValueError(f"workflow model artifact {name} is required")
