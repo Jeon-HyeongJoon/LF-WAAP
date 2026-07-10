@@ -121,6 +121,27 @@ def test_verdict_message_carries_decision_and_reason() -> None:
     assert "SQLi" in message.reason
 
 
+def test_verdict_message_rejects_non_boolean_blocked_flag() -> None:
+    document = json.loads(
+        encode_verdict(
+            Verdict.block(
+                (
+                    DetectionSignal(
+                        "ruleset",
+                        blocked=True,
+                        reason="SQLi pattern",
+                        score=1.0,
+                    ),
+                )
+            )
+        )
+    )
+    document["blocked"] = "false"
+
+    with pytest.raises(ValueError, match="blocked"):
+        decode_verdict(json.dumps(document).encode("utf-8"))
+
+
 def test_verdict_message_carries_operational_decision() -> None:
     verdict = Verdict.challenge(
         (

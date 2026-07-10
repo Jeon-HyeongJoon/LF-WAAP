@@ -220,7 +220,7 @@ def decode_verdict(message: bytes) -> VerdictMessage:
     """JSON 바이트 → VerdictMessage (판정 요약)."""
     document = json.loads(message)
     return VerdictMessage(
-        blocked=bool(document["blocked"]),
+        blocked=_required_bool(document["blocked"], "blocked"),
         decision=str(document["decision"]),
         reason=str(document["reason"]),
         signals=tuple(_signal_from_dict(signal) for signal in document.get("signals", ())),
@@ -230,6 +230,12 @@ def decode_verdict(message: bytes) -> VerdictMessage:
         runtime_version=str(document.get("runtime_version", "")),
         config_fingerprint=str(document.get("config_fingerprint", "")),
     )
+
+
+def _required_bool(value: object, field: str) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError(f"message field must be a boolean: {field}")
+    return value
 
 
 def encode_audit_record(audit: WafAuditRecord) -> bytes:
