@@ -51,6 +51,7 @@ $RECYCLE.BIN/
 
 # Logs and runtime output
 *.log
+!learning_data/access.log
 logs/
 tmp/
 temp/
