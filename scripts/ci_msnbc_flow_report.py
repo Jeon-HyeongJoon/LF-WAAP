@@ -117,7 +117,7 @@ def _build_flow_distribution(
     return {
         "total_flows": total,
         "unique_flow_types": len(all_rows),
-        "rare_probability_threshold": rare_probability_threshold,
+        "rare_flow_probability_threshold": rare_probability_threshold,
         "rare_flow_types": len(rare_rows),
         "rare_flow_occurrences": sum(int(row["count"]) for row in rare_rows),
         "rare_probability_mass": round(
@@ -185,7 +185,7 @@ def render_summary(metrics: dict[str, object]) -> str:
             f"- flow_total: {flow_distribution.get('total_flows', 0)}",
             f"- flow_type_count: {flow_distribution.get('unique_flow_types', 0)}",
             f"- rare_flow_probability_threshold: "
-            f"{flow_distribution.get('rare_probability_threshold', 0.0)}",
+            f"{flow_distribution.get('rare_flow_probability_threshold', 0.0)}",
             f"- rare_flow_types: {flow_distribution.get('rare_flow_types', 0)}",
             f"- rare_flow_occurrences: "
             f"{flow_distribution.get('rare_flow_occurrences', 0)}",
