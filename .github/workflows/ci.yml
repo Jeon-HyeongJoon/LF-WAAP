@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  test-and-benchmark:
+  test-and-access-log-training:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -39,38 +39,20 @@ jobs:
       - name: Run tests
         run: python -m pytest -q
 
-      - name: Run CSIC MVP smoke
-        run: python scripts/ci_csic_mvp.py --output-dir reports/ci/csic-mvp
-
-      - name: Run HMM / Hybrid benchmark
-        run: python scripts/ci_hmm_benchmark.py --output-dir reports/ci
-
       - name: Train workflow from access log
         run: python scripts/ci_access_log_training.py --output-dir reports/ci/access-log
-
-      - name: Report MSNBC flow distribution
-        run: python scripts/ci_msnbc_flow_report.py --output-dir reports/ci/msnbc-flow
 
       - name: Publish benchmark summary
         if: always()
         run: |
-          if [ -f reports/ci/csic-mvp/csic_mvp_summary.md ]; then
-            cat reports/ci/csic-mvp/csic_mvp_summary.md >> "$GITHUB_STEP_SUMMARY"
-          fi
-          if [ -f reports/ci/summary.md ]; then
-            cat reports/ci/summary.md >> "$GITHUB_STEP_SUMMARY"
-          fi
           if [ -f reports/ci/access-log/access_log_training_summary.md ]; then
             cat reports/ci/access-log/access_log_training_summary.md >> "$GITHUB_STEP_SUMMARY"
           fi
-          if [ -f reports/ci/msnbc-flow/msnbc_flow_summary.md ]; then
-            cat reports/ci/msnbc-flow/msnbc_flow_summary.md >> "$GITHUB_STEP_SUMMARY"
-          fi
 
-      - name: Upload benchmark artifacts
+      - name: Upload access-log training artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hmm-hybrid-benchmark
+          name: access-log-training
           path: reports/ci/
           if-no-files-found: error

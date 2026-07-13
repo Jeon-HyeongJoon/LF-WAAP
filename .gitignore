@@ -68,12 +68,8 @@ reports/msnbc/
 # Learning data and model artifacts
 learning_data/*.csv
 learning_data/*.pkl
-learning_data/msnbc_com_anonymous_web_data/
 learning_data/**/*.seq
 learning_data/**/*.seq.gz
-!learning_data/msnbc_com_anonymous_web_data/
-!learning_data/msnbc_com_anonymous_web_data/msnbc990928.seq/
-!learning_data/msnbc_com_anonymous_web_data/msnbc990928.seq/msnbc990928.seq
 *.joblib
 *.onnx
 
