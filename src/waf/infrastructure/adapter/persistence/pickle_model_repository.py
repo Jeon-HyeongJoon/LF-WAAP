@@ -10,7 +10,7 @@ from __future__ import annotations
 import pickle
 from pathlib import Path
 
-from waf.domain.detector.detector import Detector
+from waf.domain.port.detector import Detector
 
 
 class PickleModelRepository:

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from waf.domain.detector.detector import Detector
+from waf.domain.port.detector import Detector
 
 
 @runtime_checkable

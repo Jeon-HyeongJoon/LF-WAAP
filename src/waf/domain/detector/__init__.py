@@ -1,3 +1,3 @@
-from waf.domain.detector.detector import Detector
+from waf.domain.port.detector import Detector
 
 __all__ = ["Detector"]

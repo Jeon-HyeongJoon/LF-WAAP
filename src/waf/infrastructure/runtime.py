@@ -15,11 +15,11 @@ from threading import Lock
 from typing import TypeVar
 from uuid import uuid4
 
-from waf.domain.detector.detector import Detector
 from waf.domain.model.canonical_event import CanonicalWebEvent
 from waf.domain.model.detection import DetectionSignal
 from waf.domain.model.http_request import HttpRequest
 from waf.domain.model.verdict import Decision, Verdict
+from waf.domain.port.detector import Detector
 from waf.domain.service.block_decision_service import BlockDecisionService, BlockPolicy
 from waf.infrastructure.behavior.canonical_event_mapper import CanonicalEventMapper
 from waf.infrastructure.behavior.workflow_detector import (

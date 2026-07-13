@@ -9,7 +9,7 @@
 src/waf/
   domain/                  # 순수 비즈니스 규칙 (I/O·프레임워크 의존 없음)
     model/                 # 값 객체: HttpRequest, Flow, Verdict, DetectionSignal
-    detector/              # 포트: Detector (Protocol)
+    port/                  # 포트: Detector, TrafficSource, ModelRepository
     service/               # BlockDecisionService — 차단 결정 도메인 서비스
   application/             # InspectRequest — 유스케이스 (얇은 진입점)
   infrastructure/          # 어댑터 (구현체)
@@ -123,7 +123,7 @@ HttpRequest                                      src/waf/domain/model/http_reque
            └─ 정책(ANY/ALL)으로 신호 조합 → Verdict   block_decision_service.py:18 / src/waf/domain/model/verdict.py:17
 ```
 
-핵심: 세 플로우 모두 `Detector` 포트(`src/waf/domain/detector/detector.py:17`) 뒤의 동일 모델을
+핵심: 세 플로우 모두 `Detector` 포트(`src/waf/domain/port/detector.py:16`) 뒤의 동일 모델을
 쓴다. 학습·평가는 CSIC 어댑터로 오프라인, 차단은 같은 `.pkl`로 온라인 → "검증한 모델 = 배포하는 모델".
 
 ## 실행

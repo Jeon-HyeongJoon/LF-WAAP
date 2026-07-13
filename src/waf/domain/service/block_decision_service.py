@@ -10,10 +10,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 from enum import Enum, auto
 
-from waf.domain.detector.detector import Detector
 from waf.domain.model.detection import DetectionSignal, SignalAction
 from waf.domain.model.http_request import HttpRequest
 from waf.domain.model.verdict import Verdict
+from waf.domain.port.detector import Detector
 
 
 class BlockPolicy(Enum):
