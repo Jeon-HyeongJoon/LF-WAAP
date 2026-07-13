@@ -1,5 +1,3 @@
-"""Backward-compatible import path for flow Markov models."""
-
 from waf.infrastructure.markov.flow_model import (
     START_STATE,
     MarkovAssessment,

@@ -1,11 +1,11 @@
 from waf.domain.model.flow import Flow
 from waf.domain.model.http_request import HttpRequest
-from waf.infrastructure.behavior.markov_flow import (
+from waf.infrastructure.flow.http_flow import http_request_to_flow
+from waf.infrastructure.markov.flow_model import (
     START_STATE,
     MarkovFlowModel,
     WebFlowStateExtractor,
 )
-from waf.infrastructure.hmm.http_flow import http_request_to_flow
 
 
 def _request(method: str, path: str, query: str = "") -> HttpRequest:

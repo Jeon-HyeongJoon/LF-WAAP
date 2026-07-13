@@ -5,16 +5,16 @@ pytest.importorskip("hmmlearn")
 from waf.domain.model.flow import Direction  # noqa: E402
 from waf.domain.model.flow import Flow  # noqa: E402
 from waf.domain.model.http_request import HttpRequest  # noqa: E402
-from waf.infrastructure.behavior import HybridFlowDetector  # noqa: E402
-from waf.infrastructure.behavior.markov_flow import (  # noqa: E402
+from waf.infrastructure.flow.http_flow import http_request_to_flow  # noqa: E402
+from waf.infrastructure.flow.partition import PartitionKey  # noqa: E402
+from waf.infrastructure.hmm import HmmDetector  # noqa: E402
+from waf.infrastructure.hmm.partitioned_hmm import Assessment  # noqa: E402
+from waf.infrastructure.hybrid import HybridFlowDetector  # noqa: E402
+from waf.infrastructure.markov.flow_model import (  # noqa: E402
     START_STATE,
     MarkovAssessment,
     MarkovFlowModel,
 )
-from waf.infrastructure.hmm import HmmDetector  # noqa: E402
-from waf.infrastructure.hmm.http_flow import http_request_to_flow  # noqa: E402
-from waf.infrastructure.hmm.partition import PartitionKey  # noqa: E402
-from waf.infrastructure.hmm.partitioned_hmm import Assessment  # noqa: E402
 
 
 def _flow(method: str, path: str, query: str = "") -> Flow:

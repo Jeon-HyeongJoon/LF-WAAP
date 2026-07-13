@@ -15,7 +15,7 @@ from waf.domain.model.detection import DetectionSignal
 from waf.domain.model.flow import Flow
 from waf.domain.model.http_request import HttpRequest
 from waf.infrastructure.hmm.features import ByteClassExtractor, FeatureExtractor
-from waf.infrastructure.hmm.http_flow import http_request_to_flow
+from waf.infrastructure.flow.http_flow import http_request_to_flow
 from waf.infrastructure.hmm.partitioned_hmm import Assessment, PartitionedHmm
 
 

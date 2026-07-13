@@ -4,12 +4,6 @@ from waf.infrastructure.behavior.endpoint_signature import (
     EndpointSignature,
     EndpointSignatureBuilder,
 )
-from waf.infrastructure.behavior.hybrid_flow_detector import HybridFlowAssessment, HybridFlowDetector
-from waf.infrastructure.behavior.markov_flow import (
-    MarkovAssessment,
-    MarkovFlowModel,
-    WebFlowStateExtractor,
-)
 from waf.infrastructure.behavior.route_template import RouteTemplate, RouteTemplateResolver
 from waf.infrastructure.behavior.session_identity import SessionIdentity, SessionIdentityResolver
 from waf.infrastructure.behavior.session_state import (
@@ -25,6 +19,8 @@ from waf.infrastructure.behavior.workflow_detector import (
     WorkflowModelSnapshot,
     WorkflowTransitionModel,
 )
+from waf.infrastructure.hybrid import HybridFlowAssessment, HybridFlowDetector
+from waf.infrastructure.markov import MarkovAssessment, MarkovFlowModel, WebFlowStateExtractor
 
 __all__ = [
     "ActionCatalog",

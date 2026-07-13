@@ -1,5 +1,5 @@
 from waf.domain.model.flow import Direction, Flow
-from waf.infrastructure.hmm.partition import length_bucket, partition_key
+from waf.infrastructure.flow.partition import length_bucket, partition_key
 
 
 def test_length_buckets() -> None:

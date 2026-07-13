@@ -10,7 +10,7 @@ from waf.domain.model.flow import Flow
 from waf.infrastructure.hmm.ensemble_hmm import EnsembleNormalHMM
 from waf.infrastructure.hmm.features import FeatureExtractor
 from waf.infrastructure.hmm.normal_hmm import NormalHMM, OneClassModel
-from waf.infrastructure.hmm.partition import PartitionKey, partition_key
+from waf.infrastructure.flow.partition import PartitionKey, partition_key
 
 
 @dataclass(frozen=True, slots=True)

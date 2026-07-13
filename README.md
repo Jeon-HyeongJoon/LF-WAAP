@@ -77,7 +77,7 @@ train_model()                                   learning_data/calibrate_cli.py:4
  └─ CalibrateModel.__call__(detector)            src/waf/application/calibrate_model.py:28
       ├─ detector.train(normal, validation)      hmm_detector.py:91
       │   └─ PartitionedHmm.train()              src/waf/infrastructure/hmm/partitioned_hmm.py:109
-      │        ├─ partition_key(flow)            src/waf/infrastructure/hmm/partition.py:38  (proto,port,dir,len-bucket)
+      │        ├─ partition_key(flow)            src/waf/infrastructure/flow/partition.py:32  (proto,port,dir,len-bucket)
       │        ├─ FeatureExtractor.extract()     src/waf/infrastructure/hmm/features.py  (ByteClass:91 / RawByte:59 / WindowToken:113)
       │        ├─ _new_model()                   partitioned_hmm.py:49  → NormalHMM(:59) | EnsembleNormalHMM(:22)
       │        ├─ model.fit(seqs)                normal_hmm.py:96  (Baum–Welch + Laplace smoothing :121)
@@ -99,7 +99,7 @@ evaluate_model()                                 learning_data/calibrate_cli.py:
       ├─ record_to_flow(record)                  csic_traffic_source.py:32
       ├─ HmmDetector.assess_flow(flow)           hmm_detector.py:94
       │    └─ PartitionedHmm.assess()            partitioned_hmm.py:134
-      │         ├─ partition_key → 파티션 모델 라우팅          partition.py:38
+      │         ├─ partition_key → 파티션 모델 라우팅          flow/partition.py:32
       │         ├─ 보정 모델 없음 → Assessment(covered=False)  partitioned_hmm.py:17  (fail-open)
       │         └─ model.is_anomaly(extract(flow)) → (blocked, score)   normal_hmm.py:186
       ├─ 정상/공격 점수 누적 → evaluate()         src/waf/infrastructure/hmm/evaluation.py:142
@@ -116,7 +116,7 @@ HttpRequest                                      src/waf/domain/model/http_reque
  └─ InspectRequest.__call__(request)             src/waf/application/inspect_request.py:20
       └─ BlockDecisionService.decide(request)     src/waf/domain/service/block_decision_service.py:36
            ├─ HmmDetector.inspect(request)        hmm_detector.py:97
-           │    ├─ http_request_to_flow(request)  src/waf/infrastructure/hmm/http_flow.py:26
+           │    ├─ http_request_to_flow(request)  src/waf/infrastructure/flow/http_flow.py:25
            │    ├─ 미학습 → fail-open abstain      hmm_detector.py:99
            │    └─ PartitionedHmm.assess → DetectionSignal(blocked,reason,score)   src/waf/domain/model/detection.py:9
            ├─ RuleSetDetector.inspect(request)    src/waf/infrastructure/ruleset/ruleset_detector.py:46

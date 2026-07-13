@@ -10,7 +10,7 @@ import random
 
 from waf.domain.model.flow import Direction, Flow
 from waf.domain.model.http_request import HttpRequest
-from waf.infrastructure.hmm.http_flow import http_request_to_flow
+from waf.infrastructure.flow.http_flow import http_request_to_flow
 
 _PATHS = ["/index.html", "/products", "/api/items", "/search", "/account"]
 _AGENTS = ["Mozilla/5.0", "curl/8.4.0", "PostmanRuntime/7.36"]
